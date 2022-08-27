@@ -82,13 +82,18 @@ class LayerControl(PySide6.QtWidgets.QGroupBox):
 
         self.level_control = self.add_knob(knobs_layout, 'LEVEL', 17, 0, 0)
         self.modulation_amount_control = self.add_knob(knobs_layout, 'AMOUNT', 29, 0, 1)
-        knobs_layout.addWidget(PySide6.QtWidgets.QLabel(f'<b>MOD</b>'), 0, 2, 2, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignVCenter)
-        self.modulation_rate_control = self.add_knob(knobs_layout, 'RATE', 46, 0, 3)
+        self.modulation_rate_control = self.add_knob(knobs_layout, 'RATE', 46, 0, 2)
 
         self.pitch_control = self.add_knob(knobs_layout, 'PITCH', 26, 2, 0)
         self.envelope_generator_attack_control = self.add_knob(knobs_layout, 'ATTACK', 20, 2, 1)
-        knobs_layout.addWidget(PySide6.QtWidgets.QLabel(f'<b>EG</b>'), 2, 2, 2, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignVCenter)
-        self.envelope_generator_release_control = self.add_knob(knobs_layout, 'RELEASE', 23, 2, 3)
+        self.envelope_generator_release_control = self.add_knob(knobs_layout, 'RELEASE', 23, 2, 2)
+        if layer_numer == 1:
+            self.send_amount_control = self.add_knob(knobs_layout, 'SEND', 103, 2, 3)
+
+            self.bit_reduction_amount_control = self.add_knob(knobs_layout, 'BIT', 49, 4, 0)
+            self.wave_folder_amount_control = self.add_knob(knobs_layout, 'FLD', 50, 4, 1)
+            self.overdrive_gain_control = self.add_knob(knobs_layout, 'DRV', 51, 4, 2)
+            self.pre_mix_gain_adjustment_control = self.add_knob(knobs_layout, 'GAN', 52, 4, 3)
 
         self.toggled.connect(self.layer_toggled)
 
@@ -118,6 +123,7 @@ class LayerControl(PySide6.QtWidgets.QGroupBox):
         knob.setRange(0, 127)
         knob.setNotchesVisible(True)
         knob.setProperty("control", control)
+        knob.setFixedSize(knob.minimumSizeHint())
         knob.valueChanged.connect(self.process_control_change)
         layout.addWidget(knob, row + 1, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignTop)
         return knob
@@ -153,18 +159,10 @@ class LayerControl(PySide6.QtWidgets.QGroupBox):
         self.process_combination_change(None, True)
 
     def sync(self, other) -> None:
-        self.sound_sources_button_group.button(other.sound_sources_button_group.checkedId()).setChecked(True)
-        self.pitch_modulators_button_group.button(other.pitch_modulators_button_group.checkedId()).setChecked(True)
-        self.amplitude_envelope_generators_button_group.button(other.amplitude_envelope_generators_button_group.checkedId()).setChecked(True)
-        self.level_control.setValue(other.level_control.value())
-        self.modulation_amount_control.setValue(other.modulation_amount_control.value())
-        self.modulation_rate_control.setValue(other.modulation_rate_control.value())
-        self.pitch_control.setValue(other.pitch_control.value())
-        self.envelope_generator_attack_control.setValue(other.envelope_generator_attack_control.value())
-        self.envelope_generator_release_control.setValue(other.envelope_generator_release_control.value())
+        self.restore(other.store())
 
     def store(self) -> dict:
-        return {
+        stored_values = {
             'combination-index': self.combination_index,
             'level': self.level_control.value(),
             'modulation-amount': self.modulation_amount_control.value(),
@@ -173,22 +171,38 @@ class LayerControl(PySide6.QtWidgets.QGroupBox):
             'envelope-generator-attack': self.envelope_generator_attack_control.value(),
             'envelope-generator-release': self.envelope_generator_release_control.value(),
         }
+        if self.layer_numer == 1:
+            stored_values['send-amount'] = self.send_amount_control.value()
+            stored_values['bit-reduction-amount'] = self.bit_reduction_amount_control.value()
+            stored_values['wave-folder-amount'] = self.wave_folder_amount_control.value()
+            stored_values['overdrive-gain'] = self.overdrive_gain_control.value()
+            stored_values['pre-mix-gain-adjustment'] = self.pre_mix_gain_adjustment_control.value()
+        return stored_values
 
     def restore(self, stored_values: typing.Optional[dict]) -> None:
-        self.set_combination(stored_values.get('combination-index', 127 // 2))
-        self.level_control.setValue(stored_values.get('level', 127 // 2))
-        self.modulation_amount_control.setValue(stored_values.get('modulation-amount', 127 // 2))
-        self.modulation_rate_control.setValue(stored_values.get('modulation-rate', 127 // 2))
-        self.pitch_control.setValue(stored_values.get('pitch', 127 // 4))
-        self.envelope_generator_attack_control.setValue(stored_values.get('envelope-generator-attack', 127 // 2))
-        self.envelope_generator_release_control.setValue(stored_values.get('envelope-generator-release', 127 // 2))
+        def update_knob(knob: PySide6.QtWidgets.QDial, value: int) -> None:
+            if knob.value() == value:
+                # Force sending signal.
+                knob.valueChanged.emit(knob.value())
+            else:
+                knob.setValue(value)
 
-        # Just set the following parameters to defaults:
+        self.set_combination(stored_values.get('combination-index', 0))
+        update_knob(self.level_control, stored_values.get('level', 127 // 2))
+        update_knob(self.modulation_amount_control, stored_values.get('modulation-amount', 127 // 2))
+        update_knob(self.modulation_rate_control, stored_values.get('modulation-rate', 127 // 2))
+        update_knob(self.pitch_control, stored_values.get('pitch', 127 // 4))
+        update_knob(self.envelope_generator_attack_control, stored_values.get('envelope-generator-attack', 127 // 2))
+        update_knob(self.envelope_generator_release_control, stored_values.get('envelope-generator-release', 127 // 2))
+        if self.layer_numer == 1:
+            update_knob(self.send_amount_control, stored_values.get('send-amount', 0))
+            update_knob(self.bit_reduction_amount_control, stored_values.get('bit-reduction-amount', 0))
+            update_knob(self.wave_folder_amount_control, stored_values.get('wave-folder-amount', 127 // 4))
+            update_knob(self.overdrive_gain_control, stored_values.get('overdrive-gain', 127 // 4))
+            update_knob(self.pre_mix_gain_adjustment_control, stored_values.get('pre-mix-gain-adjustment', 127 // 2))
+
+        # Force it to be always in balance.
         self.control_changed.emit(10, 127 // 2)  # left-right pan
-        self.control_changed.emit(49, 127 // 2)  # bit reduction amount
-        self.control_changed.emit(50, 127 // 2)  # wave folder amount
-        self.control_changed.emit(51, 127 // 2)  # overdrive gain
-        self.control_changed.emit(52, 127 // 2)  # pre-mix gain adjustment
 
 
 class PartControl(PySide6.QtWidgets.QGroupBox):
@@ -199,13 +213,13 @@ class PartControl(PySide6.QtWidgets.QGroupBox):
         super().__init__()
         self.setTitle(f'Part {part_number}')
         self.part_number = part_number
-        layout = PySide6.QtWidgets.QGridLayout()
+        layout = PySide6.QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         self.layer_controls = [LayerControl(part_number, i) for i in range(1, 2 + 1)]
         for i, layer_control in enumerate(self.layer_controls):
             layer_control.setCheckable(i == 1)
             layer_control.setChecked(i == 0)
-            layout.addWidget(layer_control, 0, i)
+            layout.addWidget(layer_control)
             layer_control.control_changed.connect(self.process_control_change)
         self.layer_controls[1].layer_toggled.connect(self.process_layer_toggle)
 
@@ -224,6 +238,9 @@ class PartControl(PySide6.QtWidgets.QGroupBox):
         return stored_values
 
     def restore(self, stored_values) -> None:
+        self.layer_controls[1].blockSignals(True)
+        self.layer_controls[1].setChecked(True)
+        self.layer_controls[1].blockSignals(False)
         self.layer_controls[0].restore(stored_values.get('layer1', {}))
         self.layer_controls[1].restore(stored_values.get('layer2' if 'layer2' in stored_values else 'layer1', {}))
         self.layer_controls[1].setChecked('layer2' in stored_values)
@@ -240,7 +257,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.centralWidget().setLayout(layout)
         self.part_controls = [PartControl(i) for i in range(1, 6 + 1)]
         for i, part_control in enumerate(self.part_controls):
-            layout.addWidget(part_control, i // 3, i % 3)
+            layout.addWidget(part_control, 0, i)
             part_control.control_changed.connect(self.process_control_change)
 
         device_name = 'UM-ONE 1'  # TODO: make it selectable.
@@ -254,6 +271,10 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         print(f'channel={self.part_controls.index(self.sender())}, control={control}, value={value}')
         message = mido.Message('control_change', channel=self.part_controls.index(self.sender()), control=control, value=value)
         self.port.send(message)
+
+    def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
+        super().showEvent(event)
+        self.restore()
 
     def store(self) -> None:
         stored_values = {'parts': {f'part{i + 1}': self.part_controls[i].store() for i in range(6)}}
@@ -275,7 +296,6 @@ def main() -> int:
     application = PySide6.QtWidgets.QApplication(sys.argv)
     main_window = MainWindow()
     main_window.showMaximized()
-    main_window.restore()
     ret_code = application.exec()
     main_window.store()
     return ret_code
