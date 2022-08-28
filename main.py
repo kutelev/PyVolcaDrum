@@ -1,4 +1,3 @@
-import enum
 import json
 import os
 import sys
@@ -13,16 +12,12 @@ root_directory_path = os.path.abspath(os.path.dirname(os.path.relpath(__file__))
 resources_directory_path = os.path.join(root_directory_path, 'resources')
 
 
-def check_int_value(name: str, value: int, min_value: int, max_value: int) -> None:
-    if not isinstance(value, int):
-        raise TypeError(f'{name} must be of type int')
-    if not min_value <= value <= max_value:
-        raise TypeError(f'{name} must in the range from {min_value} to {max_value}')
-
-
 class Knob(PySide6.QtWidgets.QDial):
-    def __init__(self):
+    def __init__(self, control_number: int, control_name: str, default_value: int):
         super().__init__()
+        self.setProperty('control-number', control_number)
+        self.setProperty('control-name', control_name)
+        self.setProperty('default-value', default_value)
         self.setWrapping(False)
         self.setRange(0, 127)
         self.setNotchesVisible(True)
@@ -37,16 +32,26 @@ class Knob(PySide6.QtWidgets.QDial):
         painter.drawText((self.width() - text_size.width()) // 2, (self.height() + text_size.height() // 2) // 2, text)
 
 
-class AbstractControl(PySide6.QtWidgets.QGroupBox):
-    def __init__(self, title: str):
-        super().__init__()
-        self.setTitle(title)
+class GroupOfButtons(PySide6.QtWidgets.QWidget):
+    valueChanged = PySide6.QtCore.Signal(int)
 
-    def add_row_of_parameters(self, layout: PySide6.QtWidgets.QGridLayout, name: str, row: int, names: typing.Dict[enum.IntEnum, str], resource_type: str) -> \
+    def __init__(self, control_number: int, control_name: str):
+        super().__init__()
+        self.setLayout(PySide6.QtWidgets.QGridLayout())
+        self.setProperty('control-number', control_number)
+        self.setProperty('control-name', control_name)
+        self.setProperty('default-value', 0)
+        self.setSizePolicy(self.sizePolicy().horizontalPolicy(), PySide6.QtWidgets.QSizePolicy.Policy.Maximum)
+        self._value = 0
+
+    def _layout(self) -> PySide6.QtWidgets.QGridLayout:
+        return super().layout()
+
+    def _add_row_of_tool_buttons(self, name: str, row: int, names: typing.List[str], resource_type: str) -> \
             PySide6.QtWidgets.QButtonGroup:
-        layout.addWidget(PySide6.QtWidgets.QLabel(f'<b>{name}</b>'), row, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
+        self.layout().addWidget(PySide6.QtWidgets.QLabel(f'<b>{name}</b>'), row, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
         button_group = PySide6.QtWidgets.QButtonGroup(self)
-        for i, parameter_name in enumerate(names.values()):
+        for i, parameter_name in enumerate(names):
             icon_name = parameter_name.lower().replace(" ", "-")
             icon_path = os.path.join(resources_directory_path, resource_type, f'{icon_name}.svg')
             icon = PySide6.QtGui.QIcon(icon_path)
@@ -57,191 +62,204 @@ class AbstractControl(PySide6.QtWidgets.QGroupBox):
             button.setToolTip(parameter_name)
             button_group.addButton(button)
             button_group.setId(button, i)
-            layout.addWidget(button, row, 1 + i)
-        button_group.buttonToggled.connect(self.process_combination_change)
+            self.layout().addWidget(button, row, 1 + i)
+        button_group.buttonToggled.connect(self._process_control_change)
         return button_group
 
-    def add_knob(self, layout: PySide6.QtWidgets.QGridLayout, name: str, control: int, row: int, col: int) -> PySide6.QtWidgets.QDial:
-        layout.addWidget(PySide6.QtWidgets.QLabel(f'<b>{name}</b>'), row, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignBottom)
-        knob = Knob()
-        knob.setProperty("control", control)
+    def _process_control_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
+        raise NotImplemented
+
+    def setValue(self, value) -> None:  # noqa: Qt notation is used intentionally.
+        raise NotImplemented
+
+    def value(self) -> int:
+        return self._value
+
+
+class SelectControl(GroupOfButtons):
+    def __init__(self, control_number: int):
+        super().__init__(control_number, 'select')
+
+        sound_sources = [
+            'Sine wave',
+            'Sawtooth wave',
+            'High pass filtered noise',
+            'Low pass filtered noise',
+            'Band pass filtered noise',
+        ]
+
+        pitch_modulators = [
+            'Rise-fall',
+            'Oscillate',
+            'Random',
+        ]
+
+        amplitude_envelope_generators = [
+            'Linear attack-release',
+            'Exponential attack-release',
+            'Multi-peak attack-release',
+        ]
+
+        self.__sound_source_selector = self._add_row_of_tool_buttons('SRC', 0, sound_sources, 'sound-source')
+        self.__pitch_modulator_selector = self._add_row_of_tool_buttons('MOD', 1, pitch_modulators, 'pitch-modulator')
+        self.__amplitude_envelope_generator_selector = self._add_row_of_tool_buttons('EG', 2, amplitude_envelope_generators, 'amplitude-envelope-generator')
+
+    @property
+    def __combination_index(self) -> int:
+        return self.__sound_source_selector.checkedId() * 9 + \
+               self.__pitch_modulator_selector.checkedId() * 3 + \
+               self.__amplitude_envelope_generator_selector.checkedId()
+
+    @property
+    def __max_combination_count_index(self) -> int:
+        combination_count = 5 * 3 * 3  # (5 sound source types) X (3 pitch modulator types) X (3 amplitude envelope generator types)
+        return combination_count - 1
+
+    @property
+    def __normalized_combination_index(self) -> int:
+        return (127 * self.__combination_index + self.__max_combination_count_index - 1) // self.__max_combination_count_index
+
+    def _process_control_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
+        if not checked:
+            return
+        self.setValue(self.__normalized_combination_index)
+
+    def setValue(self, value) -> None:  # noqa: Qt notation is used intentionally.
+        if value == self.value():
+            return
+        combination_index = value * self.__max_combination_count_index // 127
+        amplitude_envelope_generator_type = combination_index % 3
+        pitch_modulator_type = (combination_index // 3) % 3
+        sound_source_type = (combination_index // 9) % 5
+        for button_group in [self.__sound_source_selector, self.__pitch_modulator_selector, self.__amplitude_envelope_generator_selector]:
+            button_group.blockSignals(True)
+        self.__sound_source_selector.button(sound_source_type).setChecked(True)
+        self.__pitch_modulator_selector.button(pitch_modulator_type).setChecked(True)
+        self.__amplitude_envelope_generator_selector.button(amplitude_envelope_generator_type).setChecked(True)
+        for button_group in [self.__sound_source_selector, self.__pitch_modulator_selector, self.__amplitude_envelope_generator_selector]:
+            button_group.blockSignals(False)
+        self._value = value
+        self.valueChanged.emit(value)
+
+
+class ResonatorModelControl(GroupOfButtons):
+    def __init__(self, control_number: int):
+        super().__init__(control_number, 'resonator-model')
+        self.__resonator_model_selector = self._add_row_of_tool_buttons('RES', 0, ['Tube', 'String'], 'waveguide-resonator')
+
+    def _process_control_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
+        if not checked:
+            return
+        self.setValue(self.__resonator_model_selector.checkedId() * 127)
+
+    def setValue(self, value) -> None:  # noqa: Qt notation is used intentionally.
+        if value == self.value():
+            return
+        self.__resonator_model_selector.blockSignals(True)
+        self.__resonator_model_selector.button(value // 127).setChecked(True)
+        self.__resonator_model_selector.blockSignals(False)
+        self._value = value
+        self.valueChanged.emit(value)
+
+
+class GroupOfControls(PySide6.QtWidgets.QGroupBox):
+    control_changed = PySide6.QtCore.Signal(int, int)
+
+    def __init__(self, title: str):
+        super().__init__()
+        self.setTitle(title)
+        self._controls: typing.List[typing.Union[Knob, GroupOfButtons]] = []
+
+    def add_knob(self, layout: PySide6.QtWidgets.QGridLayout, title: str, control_number: int, control_name: str, default_value: int, row: int, col: int) -> \
+            Knob:
+        layout.addWidget(PySide6.QtWidgets.QLabel(f'<b>{title}</b>'), row, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignBottom)
+        knob = Knob(control_number, control_name, default_value)
         knob.valueChanged.connect(self.process_control_change)
         layout.addWidget(knob, row + 1, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignTop)
         return knob
 
     @staticmethod
-    def update_knob(knob: PySide6.QtWidgets.QDial, value: int, force: bool) -> None:
-        if knob.value() == value:
+    def restore_control(control: typing.Union[PySide6.QtWidgets.QDial, GroupOfButtons], value: int, force: bool) -> None:
+        if control.value() == value:
             if force:
                 # Force sending signal.
-                knob.valueChanged.emit(knob.value())
+                control.valueChanged.emit(control.value())
         else:
-            knob.setValue(value)
-
-    def process_combination_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
-        pass
-
-    def process_control_change(self) -> None:
-        pass
-
-
-class LayerControl(AbstractControl):
-    control_changed = PySide6.QtCore.Signal(int, int)
-    layer_toggled = PySide6.QtCore.Signal()
-
-    class SoundSourceTypes(enum.IntEnum):
-        SINE_WAVE = 0
-        SAWTOOTH_WAVE = 1
-        HIGH_PASS_FILTERED_NOISE = 2
-        LOW_PASS_FILTERED_NOISE = 3
-        BAND_PASS_FILTERED_NOISE = 4
-
-    class PitchModulatorTypes(enum.IntEnum):
-        RISE_FALL = 0
-        OSCILLATE = 1
-        RANDOM = 2
-
-    class AmplitudeEnvelopeGeneratorTypes(enum.IntEnum):
-        LINEAR_ATTACK_RELEASE = 0
-        EXPONENTIAL_ATTACK_RELEASE = 1
-        MULTI_PEAK_ATTACK_RELEASE = 2
-
-    sound_source_names = {
-        SoundSourceTypes.SINE_WAVE: 'Sine wave',
-        SoundSourceTypes.SAWTOOTH_WAVE: 'Sawtooth wave',
-        SoundSourceTypes.HIGH_PASS_FILTERED_NOISE: 'High pass filtered noise',
-        SoundSourceTypes.LOW_PASS_FILTERED_NOISE: 'Low pass filtered noise',
-        SoundSourceTypes.BAND_PASS_FILTERED_NOISE: 'Band pass filtered noise',
-    }
-
-    pitch_modulator_names = {
-        PitchModulatorTypes.RISE_FALL: 'Rise-fall',
-        PitchModulatorTypes.OSCILLATE: 'Oscillate',
-        PitchModulatorTypes.RANDOM: 'Random',
-    }
-
-    amplitude_envelope_generator_names = {
-        AmplitudeEnvelopeGeneratorTypes.LINEAR_ATTACK_RELEASE: 'Linear attack-release',
-        AmplitudeEnvelopeGeneratorTypes.EXPONENTIAL_ATTACK_RELEASE: 'Exponential attack-release',
-        AmplitudeEnvelopeGeneratorTypes.MULTI_PEAK_ATTACK_RELEASE: 'Multi-peak attack-release',
-    }
-
-    def __init__(self, part_number: int, layer_numer: int):
-        check_int_value('part_number', part_number, 1, 6)
-        check_int_value('layer_numer', layer_numer, 1, 2)
-        super().__init__(f'LAYER {layer_numer}')
-        self.layer_numer = layer_numer
-        self.part_number = part_number
-        combination_layout = PySide6.QtWidgets.QGridLayout()
-        knobs_layout = PySide6.QtWidgets.QGridLayout()
-        layout = PySide6.QtWidgets.QVBoxLayout()
-        layout.addLayout(combination_layout)
-        layout.addLayout(knobs_layout)
-        self.setLayout(layout)
-
-        self.sound_sources_button_group = self.add_row_of_parameters(combination_layout, 'SRC', 0, LayerControl.sound_source_names, 'sound-source')
-        self.pitch_modulators_button_group = self.add_row_of_parameters(combination_layout, 'MOD', 1, LayerControl.pitch_modulator_names, 'pitch-modulator')
-        self.amplitude_envelope_generators_button_group = \
-            self.add_row_of_parameters(combination_layout, 'EG', 2, LayerControl.amplitude_envelope_generator_names, 'amplitude-envelope-generator')
-
-        self.level_control = self.add_knob(knobs_layout, 'LEVEL', 17, 0, 0)
-        self.modulation_amount_control = self.add_knob(knobs_layout, 'AMOUNT', 29, 0, 1)
-        self.modulation_rate_control = self.add_knob(knobs_layout, 'RATE', 46, 0, 2)
-
-        self.pitch_control = self.add_knob(knobs_layout, 'PITCH', 26, 2, 0)
-        self.envelope_generator_attack_control = self.add_knob(knobs_layout, 'ATTACK', 20, 2, 1)
-        self.envelope_generator_release_control = self.add_knob(knobs_layout, 'RELEASE', 23, 2, 2)
-        if layer_numer == 1:
-            self.send_amount_control = self.add_knob(knobs_layout, 'SEND', 103, 2, 3)
-
-            self.bit_reduction_amount_control = self.add_knob(knobs_layout, 'BIT', 49, 4, 0)
-            self.wave_folder_amount_control = self.add_knob(knobs_layout, 'FLD', 50, 4, 1)
-            self.overdrive_gain_control = self.add_knob(knobs_layout, 'DRV', 51, 4, 2)
-            self.pre_mix_gain_adjustment_control = self.add_knob(knobs_layout, 'GAN', 52, 4, 3)
-
-        self.toggled.connect(self.layer_toggled)
-
-    @property
-    def combination_index(self) -> int:
-        return self.amplitude_envelope_generators_button_group.checkedId() + \
-               self.pitch_modulators_button_group.checkedId() * 3 + \
-               self.sound_sources_button_group.checkedId() * 9
-
-    @property
-    def normalized_combination_index(self) -> int:
-        combination_count = 5 * 3 * 3  # (5 sound source types) X (3 pitch modulator types) X (3 amplitude envelope generator types)
-        max_combination_count_index = combination_count - 1
-        return (127 * self.combination_index + max_combination_count_index - 1) // max_combination_count_index
-
-    def process_combination_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
-        if not checked:
-            return
-        self.control_changed.emit(14 + self.layer_numer - 1, self.normalized_combination_index)
+            control.setValue(value)
 
     def process_control_change(self) -> None:
         sender = self.sender()
-        self.control_changed.emit(sender.property("control") + self.layer_numer - 1, sender.value())
+        self.control_changed.emit(sender.property("control-number"), sender.value())
+
+    def store(self) -> dict:
+        return {control.property('control-name'): control.value() for control in self._controls}
+
+    def restore(self, stored_values: typing.Optional[dict], force: bool = True) -> None:
+        for control in self._controls:
+            self.restore_control(control, stored_values.get(control.property('control-name'), control.property('default-value')), force)
+
+
+class LayerControls(GroupOfControls):
+    layer_toggled = PySide6.QtCore.Signal()
+
+    def __init__(self, part_number: int, layer_number: int):
+        super().__init__(f'LAYER {layer_number}')
+        self.layer_number = layer_number
+        self.part_number = part_number
+
+        knobs_layout = PySide6.QtWidgets.QGridLayout()
+        select_control = SelectControl(14 + layer_number - 1)  # SELECT1 or SELECT2
+        self._controls = [
+            select_control,  # SELECT1 or SELECT2
+            # Row 0
+            self.add_knob(knobs_layout, 'LEVEL', 17 + layer_number - 1, 'level', 64, 0, 0),  # LEVEL1 or LEVEL2
+            self.add_knob(knobs_layout, 'AMOUNT', 29 + layer_number - 1, 'modulation-amount', 64, 0, 1),  # MODAMT1 or MODAMT2
+            self.add_knob(knobs_layout, 'RATE', 46 + layer_number - 1, 'modulation-rate', 64, 0, 2),  # MODRATE1 or MODRATE2
+            # Row 2
+            self.add_knob(knobs_layout, 'PITCH', 26 + layer_number - 1, 'pitch', 32, 2, 0),  # PITCH1 or PITCH2
+            self.add_knob(knobs_layout, 'ATTACK', 20 + layer_number - 1, 'envelope-generator-attack', 64, 2, 1),  # EGATT1 or EGATT2
+            self.add_knob(knobs_layout, 'RELEASE', 23 + layer_number - 1, 'envelope-generator-release', 64, 2, 2),  # EGREL1 or EGREL2
+        ]
+
+        if layer_number == 1:
+            self._controls.extend([
+                # Row 2
+                self.add_knob(knobs_layout, 'SEND', 103, 'send-amount', 0, 2, 3),  # SEND
+                # Row 4
+                self.add_knob(knobs_layout, 'BIT', 49, 'bit-reduction-amount', 0, 4, 0),  # BIT RED
+                self.add_knob(knobs_layout, 'FLD', 50, 'wave-folder-amount', 0, 4, 1),  # FOLD
+                self.add_knob(knobs_layout, 'DRV', 51, 'overdrive-gain', 0, 4, 2),  # DRIVE
+                self.add_knob(knobs_layout, 'GAN', 52, 'pre-mix-gain-adjustment', 127, 4, 3),  # DRY GAIN
+            ])
+
+        select_control.valueChanged.connect(self.process_control_change)
+        self.toggled.connect(self.layer_toggled)
+
+        layout = PySide6.QtWidgets.QVBoxLayout()
+        layout.addWidget(select_control)
+        layout.addLayout(knobs_layout)
+        self.setLayout(layout)
 
     def sync(self, other) -> None:
         self.restore(other.store(), False)
 
-    def store(self) -> dict:
-        stored_values = {
-            'combination-index': self.combination_index,
-            'level': self.level_control.value(),
-            'modulation-amount': self.modulation_amount_control.value(),
-            'modulation-rate': self.modulation_rate_control.value(),
-            'pitch': self.pitch_control.value(),
-            'envelope-generator-attack': self.envelope_generator_attack_control.value(),
-            'envelope-generator-release': self.envelope_generator_release_control.value(),
-        }
-        if self.layer_numer == 1:
-            stored_values['send-amount'] = self.send_amount_control.value()
-            stored_values['bit-reduction-amount'] = self.bit_reduction_amount_control.value()
-            stored_values['wave-folder-amount'] = self.wave_folder_amount_control.value()
-            stored_values['overdrive-gain'] = self.overdrive_gain_control.value()
-            stored_values['pre-mix-gain-adjustment'] = self.pre_mix_gain_adjustment_control.value()
-        return stored_values
-
     def restore(self, stored_values: typing.Optional[dict], force: bool = True) -> None:
-        stored_combination_index = stored_values.get('combination-index', 0)
-        if self.combination_index != stored_combination_index or force:
-            amplitude_envelope_generator_type = stored_combination_index % 3
-            pitch_modulator_type = (stored_combination_index // 3) % 3
-            sound_source_type = (stored_combination_index // 9) % 5
-            self.sound_sources_button_group.button(sound_source_type).setChecked(True)
-            self.pitch_modulators_button_group.button(pitch_modulator_type).setChecked(True)
-            self.amplitude_envelope_generators_button_group.button(amplitude_envelope_generator_type).setChecked(True)
-            self.process_combination_change(None, True)
-        self.update_knob(self.level_control, stored_values.get('level', 64), force)
-        self.update_knob(self.modulation_amount_control, stored_values.get('modulation-amount', 64), force)
-        self.update_knob(self.modulation_rate_control, stored_values.get('modulation-rate', 64), force)
-        self.update_knob(self.pitch_control, stored_values.get('pitch', 32), force)
-        self.update_knob(self.envelope_generator_attack_control, stored_values.get('envelope-generator-attack', 64), force)
-        self.update_knob(self.envelope_generator_release_control, stored_values.get('envelope-generator-release', 64), force)
-        if self.layer_numer == 1:
-            self.update_knob(self.send_amount_control, stored_values.get('send-amount', 0), force)
-            self.update_knob(self.bit_reduction_amount_control, stored_values.get('bit-reduction-amount', 0), force)
-            self.update_knob(self.wave_folder_amount_control, stored_values.get('wave-folder-amount', 0), force)
-            self.update_knob(self.overdrive_gain_control, stored_values.get('overdrive-gain', 0), force)
-            self.update_knob(self.pre_mix_gain_adjustment_control, stored_values.get('pre-mix-gain-adjustment', 127), force)
-
+        super().restore(stored_values, force)
         if force:
             # Force sound to be always in balance.
             self.control_changed.emit(10, 64)  # left-right pan
 
 
-class PartControl(PySide6.QtWidgets.QGroupBox):
+class PartControls(PySide6.QtWidgets.QGroupBox):
     control_changed = PySide6.QtCore.Signal(int, int)
 
     def __init__(self, part_number: int):
-        check_int_value('part_number', part_number, 1, 6)
         super().__init__()
         self.setTitle(f'PART {part_number}')
         self.part_number = part_number
         layout = PySide6.QtWidgets.QVBoxLayout()
         self.setLayout(layout)
-        self.layer_controls = [LayerControl(part_number, i) for i in range(1, 2 + 1)]
+        self.layer_controls = [LayerControls(part_number, i) for i in range(1, 2 + 1)]
         for i, layer_control in enumerate(self.layer_controls):
             layer_control.setCheckable(i == 1)
             layer_control.setChecked(i == 0)
@@ -272,72 +290,27 @@ class PartControl(PySide6.QtWidgets.QGroupBox):
         self.layer_controls[1].setChecked('layer2' in stored_values)
 
 
-class WaveguideResonatorControl(AbstractControl):
-    control_changed = PySide6.QtCore.Signal(int, int)
-
-    class ResonatorType(enum.IntEnum):
-        TUBE = 0
-        STRING = 1
-
-    resonator_names = {
-        ResonatorType.TUBE: 'Tube',
-        ResonatorType.STRING: 'String',
-    }
-
+class WaveguideResonatorControl(GroupOfControls):
     def __init__(self):
         super().__init__('WAVE GUIDE')
-        resonator_type_layout = PySide6.QtWidgets.QGridLayout()
         knobs_layout = PySide6.QtWidgets.QGridLayout()
         layout = PySide6.QtWidgets.QVBoxLayout()
-        layout.addLayout(resonator_type_layout)
+        resonator_model_control = ResonatorModelControl(116)  # WAVEGUIDE MODEL
+        self._controls = [
+            resonator_model_control,   # WAVEGUIDE MODEL
+            self.add_knob(knobs_layout, 'DECAY', 117, 'decay-time', 64, 0, 0),  # DECAY
+            self.add_knob(knobs_layout, 'BODY', 118, 'timbral-character', 64, 2, 0),  # BODY
+            self.add_knob(knobs_layout, 'TUNE', 119, 'pitch-tuning', 64, 4, 0),  # TUNE
+        ]
+        resonator_model_control.valueChanged.connect(self.process_control_change)
+
+        layout.addWidget(resonator_model_control)
         layout.addLayout(knobs_layout)
-        self.setLayout(layout)
-
-        self.resonator_types_button_group = \
-            self.add_row_of_parameters(resonator_type_layout, 'TYPE', 0, WaveguideResonatorControl.resonator_names, 'waveguide-resonator')
-
-        self.decay_time_control = self.add_knob(knobs_layout, 'DECAY', 117, 0, 0)
-        self.timbral_character_control = self.add_knob(knobs_layout, 'BODY', 118, 2, 0)
-        self.pitch_tuning_control = self.add_knob(knobs_layout, 'TUNE', 119, 4, 0)
-
         layout.addItem(PySide6.QtWidgets.QSpacerItem(0, 0, PySide6.QtWidgets.QSizePolicy.Policy.MinimumExpanding,
                                                      PySide6.QtWidgets.QSizePolicy.Policy.MinimumExpanding))
+        self.setLayout(layout)
 
         self.setFixedWidth(self.minimumSizeHint().width())
-
-    @property
-    def combination_index(self) -> int:
-        return self.resonator_types_button_group.checkedId()
-
-    @property
-    def normalized_combination_index(self) -> int:
-        return self.combination_index * 127
-
-    def process_combination_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
-        if not checked:
-            return
-        self.control_changed.emit(116, self.normalized_combination_index)
-
-    def process_control_change(self) -> None:
-        sender = self.sender()
-        self.control_changed.emit(sender.property("control"), sender.value())
-
-    def store(self) -> dict:
-        return {
-            'combination-index': self.combination_index,
-            'decay-time': self.decay_time_control.value(),
-            'timbral-character': self.timbral_character_control.value(),
-            'pitch-tuning': self.pitch_tuning_control.value(),
-        }
-
-    def restore(self, stored_values: typing.Optional[dict], force: bool = True) -> None:
-        stored_combination_index = stored_values.get('combination-index', 0)
-        if self.combination_index != stored_combination_index or force:
-            self.resonator_types_button_group.button(stored_combination_index).setChecked(True)
-            self.process_combination_change(None, True)
-        self.update_knob(self.decay_time_control, stored_values.get('decay-time', 64), force)
-        self.update_knob(self.timbral_character_control, stored_values.get('timbral-character', 64), force)
-        self.update_knob(self.pitch_tuning_control, stored_values.get('pitch-tuning', 64), force)
 
 
 class MainWindow(PySide6.QtWidgets.QMainWindow):
@@ -349,25 +322,24 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.setCentralWidget(PySide6.QtWidgets.QWidget())
         layout = PySide6.QtWidgets.QGridLayout()
         self.centralWidget().setLayout(layout)
-        self.part_controls = [PartControl(i) for i in range(1, 6 + 1)]
-        for i, part_control in enumerate(self.part_controls):
+        self.__part_controls = [PartControls(i) for i in range(1, 6 + 1)]
+        for i, part_control in enumerate(self.__part_controls):
             layout.addWidget(part_control, 0, i)
             part_control.control_changed.connect(self.process_control_change)
-        self.waveguide_resonator_control = WaveguideResonatorControl()
-        layout.addWidget(self.waveguide_resonator_control, 0, 6)
-        self.waveguide_resonator_control.control_changed.connect(self.process_control_change)
+        self.__waveguide_resonator_control = WaveguideResonatorControl()
+        layout.addWidget(self.__waveguide_resonator_control, 0, 6)
+        self.__waveguide_resonator_control.control_changed.connect(self.process_control_change)
 
         device_name = 'UM-ONE 1'  # TODO: make it selectable.
-        self.port = mido.open_output(device_name)  # noqa: open_output is a dynamically generated thing.
+        self.__port = mido.open_output(device_name)  # noqa: open_output is a dynamically generated thing.
 
     def __del__(self):
-        self.port.close()
+        self.__port.close()
 
     def process_control_change(self, control: int, value: int) -> None:
-        channel = 1 if self.sender() is self.waveguide_resonator_control else self.part_controls.index(self.sender())
+        channel = 1 if self.sender() is self.__waveguide_resonator_control else self.__part_controls.index(self.sender())
         print(f'channel={channel}, control={control}, value={value}')
-        message = mido.Message('control_change', channel=channel, control=control, value=value)
-        self.port.send(message)
+        self.__port.send(mido.Message('control_change', channel=channel, control=control, value=value))
 
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
@@ -375,8 +347,10 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
     def store(self) -> None:
         stored_values = {
-            'parts': {f'part{i + 1}': self.part_controls[i].store() for i in range(6)},
-            'waveguide-resonator': self.waveguide_resonator_control.store(),
+            'controls': {
+                'parts': {f'part{i + 1}': self.__part_controls[i].store() for i in range(6)},
+                'waveguide-resonator': self.__waveguide_resonator_control.store(),
+            }
         }
         with open(MainWindow.config_path, 'w') as f:
             f.write(json.dumps(stored_values, indent=2))
@@ -387,11 +361,9 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
                 stored_values = json.loads(f.read())
         else:
             stored_values = {}
-
         for i in range(6):
-            self.part_controls[i].restore(stored_values.get('parts', {}).get(f'part{i + 1}', {}))
-
-        self.waveguide_resonator_control.restore(stored_values.get('waveguide-resonator', {}))
+            self.__part_controls[i].restore(stored_values.get('controls', {}).get('parts', {}).get(f'part{i + 1}', {}))
+        self.__waveguide_resonator_control.restore(stored_values.get('controls', {}).get('waveguide-resonator', {}))
 
 
 def main() -> int:
