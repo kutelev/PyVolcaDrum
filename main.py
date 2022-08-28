@@ -20,6 +20,23 @@ def check_int_value(name: str, value: int, min_value: int, max_value: int) -> No
         raise TypeError(f'{name} must in the range from {min_value} to {max_value}')
 
 
+class Knob(PySide6.QtWidgets.QDial):
+    def __init__(self):
+        super().__init__()
+        self.setWrapping(False)
+        self.setRange(0, 127)
+        self.setNotchesVisible(True)
+        self.setFixedSize(self.minimumSizeHint())
+
+    def paintEvent(self, event: PySide6.QtGui.QPaintEvent) -> None:
+        super().paintEvent(event)
+        painter = PySide6.QtGui.QPainter(self)
+        font_metrics = painter.fontMetrics()
+        text = str(self.value())
+        text_size = font_metrics.size(0, text, 0)
+        painter.drawText((self.width() - text_size.width()) // 2, (self.height() + text_size.height() // 2) // 2, text)
+
+
 class LayerControl(PySide6.QtWidgets.QGroupBox):
     control_changed = PySide6.QtCore.Signal(int, int)
     layer_toggled = PySide6.QtCore.Signal()
@@ -118,12 +135,8 @@ class LayerControl(PySide6.QtWidgets.QGroupBox):
 
     def add_knob(self, layout: PySide6.QtWidgets.QGridLayout, name: str, control: int, row: int, col: int) -> PySide6.QtWidgets.QDial:
         layout.addWidget(PySide6.QtWidgets.QLabel(f'<b>{name}</b>'), row, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignBottom)
-        knob = PySide6.QtWidgets.QDial()
-        knob.setWrapping(False)
-        knob.setRange(0, 127)
-        knob.setNotchesVisible(True)
+        knob = Knob()
         knob.setProperty("control", control)
-        knob.setFixedSize(knob.minimumSizeHint())
         knob.valueChanged.connect(self.process_control_change)
         layout.addWidget(knob, row + 1, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignTop)
         return knob
@@ -188,21 +201,21 @@ class LayerControl(PySide6.QtWidgets.QGroupBox):
                 knob.setValue(value)
 
         self.set_combination(stored_values.get('combination-index', 0))
-        update_knob(self.level_control, stored_values.get('level', 127 // 2))
-        update_knob(self.modulation_amount_control, stored_values.get('modulation-amount', 127 // 2))
-        update_knob(self.modulation_rate_control, stored_values.get('modulation-rate', 127 // 2))
-        update_knob(self.pitch_control, stored_values.get('pitch', 127 // 4))
-        update_knob(self.envelope_generator_attack_control, stored_values.get('envelope-generator-attack', 127 // 2))
-        update_knob(self.envelope_generator_release_control, stored_values.get('envelope-generator-release', 127 // 2))
+        update_knob(self.level_control, stored_values.get('level', 64))
+        update_knob(self.modulation_amount_control, stored_values.get('modulation-amount', 64))
+        update_knob(self.modulation_rate_control, stored_values.get('modulation-rate', 64))
+        update_knob(self.pitch_control, stored_values.get('pitch', 32))
+        update_knob(self.envelope_generator_attack_control, stored_values.get('envelope-generator-attack', 64))
+        update_knob(self.envelope_generator_release_control, stored_values.get('envelope-generator-release', 64))
         if self.layer_numer == 1:
             update_knob(self.send_amount_control, stored_values.get('send-amount', 0))
             update_knob(self.bit_reduction_amount_control, stored_values.get('bit-reduction-amount', 0))
-            update_knob(self.wave_folder_amount_control, stored_values.get('wave-folder-amount', 127 // 4))
-            update_knob(self.overdrive_gain_control, stored_values.get('overdrive-gain', 127 // 4))
-            update_knob(self.pre_mix_gain_adjustment_control, stored_values.get('pre-mix-gain-adjustment', 127 // 2))
+            update_knob(self.wave_folder_amount_control, stored_values.get('wave-folder-amount', 0))
+            update_knob(self.overdrive_gain_control, stored_values.get('overdrive-gain', 0))
+            update_knob(self.pre_mix_gain_adjustment_control, stored_values.get('pre-mix-gain-adjustment', 127))
 
         # Force it to be always in balance.
-        self.control_changed.emit(10, 127 // 2)  # left-right pan
+        self.control_changed.emit(10, 64)  # left-right pan
 
 
 class PartControl(PySide6.QtWidgets.QGroupBox):
