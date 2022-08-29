@@ -52,7 +52,7 @@ class GroupOfButtons(PySide6.QtWidgets.QWidget):
         self.layout().addWidget(PySide6.QtWidgets.QLabel(f'<b>{name}</b>'), row, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
         button_group = PySide6.QtWidgets.QButtonGroup(self)
         for i, parameter_name in enumerate(names):
-            icon_name = parameter_name.lower().replace(" ", "-")
+            icon_name = parameter_name.lower().replace(' ', '-')
             icon_path = os.path.join(resources_directory_path, resource_type, f'{icon_name}.svg')
             icon = PySide6.QtGui.QIcon(icon_path)
             button = PySide6.QtWidgets.QToolButton()
@@ -189,7 +189,7 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
 
     def process_control_change(self) -> None:
         sender = self.sender()
-        self.control_changed.emit(sender.property("control-number"), sender.value())
+        self.control_changed.emit(sender.property('control-number'), sender.value())
 
     def store(self) -> dict:
         return {control.property('control-name'): control.value() for control in self._controls}
@@ -313,12 +313,53 @@ class WaveguideResonatorControl(GroupOfControls):
         self.setFixedWidth(self.minimumSizeHint().width())
 
 
-class MainWindow(PySide6.QtWidgets.QMainWindow):
+class PortSelectionDialog(PySide6.QtWidgets.QDialog):
     config_path = os.path.join(root_directory_path, 'config.json')
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('PyVolca')
+        self.setWindowTitle('PyVolcaDrum: chose port')
+
+        self.port_selector = PySide6.QtWidgets.QComboBox()
+        self.port_selector.addItem('')
+        for port_name in mido.get_output_names():  # noqa: get_output_names is a dynamically generated thing.
+            self.port_selector.addItem(port_name)
+        self.port_selector.currentTextChanged.connect(self.port_selected)
+
+        self.ok_button = PySide6.QtWidgets.QPushButton('Ok')
+        self.ok_button.hide()
+        self.ok_button.clicked.connect(self.accept)
+
+        layout = PySide6.QtWidgets.QVBoxLayout()
+        layout.addWidget(self.port_selector)
+        layout.addWidget(self.ok_button)
+        self.setLayout(layout)
+
+        self.setFixedSize(self.sizeHint())
+
+    def port_selected(self) -> None:
+        self.ok_button.setVisible(bool(self.port_selector.currentText()))
+        self.setFixedSize(self.sizeHint())
+
+    def get_port_name(self) -> typing.Optional[str]:
+        return self.port_selector.currentText() if self.port_selector.currentText() else None
+
+    def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
+        super().showEvent(event)
+        if not os.path.exists(PortSelectionDialog.config_path):
+            return
+        with open(PortSelectionDialog.config_path) as f:
+            config = json.loads(f.read())
+        if 'port' in config:
+            self.port_selector.setCurrentText(config['port'])
+
+
+class MainWindow(PySide6.QtWidgets.QMainWindow):
+    config_path = os.path.join(root_directory_path, 'config.json')
+
+    def __init__(self, port_name: str):
+        super().__init__()
+        self.setWindowTitle('PyVolcaDrum')
         self.setCentralWidget(PySide6.QtWidgets.QWidget())
         layout = PySide6.QtWidgets.QGridLayout()
         self.centralWidget().setLayout(layout)
@@ -329,9 +370,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.__waveguide_resonator_control = WaveguideResonatorControl()
         layout.addWidget(self.__waveguide_resonator_control, 0, 6)
         self.__waveguide_resonator_control.control_changed.connect(self.process_control_change)
-
-        device_name = 'UM-ONE 1'  # TODO: make it selectable.
-        self.__port = mido.open_output(device_name)  # noqa: open_output is a dynamically generated thing.
+        self.__port = mido.open_output(port_name)  # noqa: open_output is a dynamically generated thing.
 
     def __del__(self):
         self.__port.close()
@@ -347,10 +386,11 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
     def store(self) -> None:
         stored_values = {
+            'port': self.__port.name,
             'controls': {
                 'parts': {f'part{i + 1}': self.__part_controls[i].store() for i in range(6)},
                 'waveguide-resonator': self.__waveguide_resonator_control.store(),
-            }
+            },
         }
         with open(MainWindow.config_path, 'w') as f:
             f.write(json.dumps(stored_values, indent=2))
@@ -368,7 +408,12 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
 def main() -> int:
     application = PySide6.QtWidgets.QApplication(sys.argv)
-    main_window = MainWindow()
+
+    port_selector = PortSelectionDialog()
+    if port_selector.exec() != PySide6.QtWidgets.QDialog.Accepted:
+        return 1
+
+    main_window = MainWindow(port_selector.get_port_name())
     main_window.showMaximized()
     ret_code = application.exec()
     main_window.store()
