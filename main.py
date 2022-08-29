@@ -215,11 +215,18 @@ class LayerControls(GroupOfControls):
             self.add_knob(knobs_layout, 'LEVEL', 17 + layer_number - 1, 'level', 64, 0, 0),  # LEVEL1 or LEVEL2
             self.add_knob(knobs_layout, 'AMOUNT', 29 + layer_number - 1, 'modulation-amount', 64, 0, 1),  # MODAMT1 or MODAMT2
             self.add_knob(knobs_layout, 'RATE', 46 + layer_number - 1, 'modulation-rate', 64, 0, 2),  # MODRATE1 or MODRATE2
+        ]
+        if layer_number == 1:
+            self._controls.extend([
+                # Row 0
+                self.add_knob(knobs_layout, 'PAN', 10, 'left-right-pan', 64, 0, 3),  # PAN
+            ])
+        self._controls.extend([
             # Row 2
             self.add_knob(knobs_layout, 'PITCH', 26 + layer_number - 1, 'pitch', 32, 2, 0),  # PITCH1 or PITCH2
             self.add_knob(knobs_layout, 'ATTACK', 20 + layer_number - 1, 'envelope-generator-attack', 64, 2, 1),  # EGATT1 or EGATT2
             self.add_knob(knobs_layout, 'RELEASE', 23 + layer_number - 1, 'envelope-generator-release', 64, 2, 2),  # EGREL1 or EGREL2
-        ]
+        ])
 
         if layer_number == 1:
             self._controls.extend([
@@ -245,9 +252,6 @@ class LayerControls(GroupOfControls):
 
     def restore(self, stored_values: typing.Optional[dict], force: bool = True) -> None:
         super().restore(stored_values, force)
-        if force:
-            # Force sound to be always in balance.
-            self.control_changed.emit(10, 64)  # left-right pan
 
 
 class PartControls(PySide6.QtWidgets.QGroupBox):
