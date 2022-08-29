@@ -8,6 +8,8 @@ import PySide6.QtGui
 import PySide6.QtWidgets
 import mido
 
+import config
+
 root_directory_path = os.path.abspath(os.path.dirname(os.path.relpath(__file__)))
 resources_directory_path = os.path.join(root_directory_path, 'resources')
 
@@ -396,15 +398,10 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
                 'waveguide-resonator': self.__waveguide_resonator_control.store(),
             },
         }
-        with open(MainWindow.config_path, 'w') as f:
-            f.write(json.dumps(stored_values, indent=2))
+        config.store_config(stored_values, MainWindow.config_path)
 
     def restore(self) -> None:
-        if os.path.exists(MainWindow.config_path):
-            with open(MainWindow.config_path) as f:
-                stored_values = json.loads(f.read())
-        else:
-            stored_values = {}
+        stored_values = config.load_config(file_path=MainWindow.config_path)
         for i in range(6):
             self.__part_controls[i].restore(stored_values.get('controls', {}).get('parts', {}).get(f'part{i + 1}', {}))
         self.__waveguide_resonator_control.restore(stored_values.get('controls', {}).get('waveguide-resonator', {}))
@@ -425,4 +422,8 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as e:  # noqa
+        print(f'Fatal error: {str(e)}', file=sys.stderr)
+        sys.exit(1)

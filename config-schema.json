@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/product.schema.json",
+  "type": "object",
+  "properties": {
+    "port": {
+      "type": "string"
+    },
+    "controls": {
+      "type": "object",
+      "properties": {
+        "parts": {
+          "type": "object",
+          "properties": {
+            "part1": {
+              "$ref": "#/$defs/part"
+            },
+            "part2": {
+              "$ref": "#/$defs/part"
+            },
+            "part3": {
+              "$ref": "#/$defs/part"
+            },
+            "part4": {
+              "$ref": "#/$defs/part"
+            },
+            "part5": {
+              "$ref": "#/$defs/part"
+            },
+            "part6": {
+              "$ref": "#/$defs/part"
+            }
+          },
+          "required": [
+            "part1",
+            "part2",
+            "part3",
+            "part4",
+            "part5",
+            "part6"
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "port",
+    "controls"
+  ],
+  "$defs": {
+    "control-value": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 127
+    },
+    "part": {
+      "type": "object",
+      "properties": {
+        "layer2": {
+          "type": "object",
+          "properties": {
+            "select": {
+              "$ref": "#/$defs/control-value"
+            },
+            "level": {
+              "$ref": "#/$defs/control-value"
+            },
+            "modulation-amount": {
+              "$ref": "#/$defs/control-value"
+            },
+            "modulation-rate": {
+              "$ref": "#/$defs/control-value"
+            },
+            "pitch": {
+              "$ref": "#/$defs/control-value"
+            },
+            "envelope-generator-attack": {
+              "$ref": "#/$defs/control-value"
+            },
+            "envelope-generator-release": {
+              "$ref": "#/$defs/control-value"
+            }
+          },
+          "required": [
+            "select",
+            "level",
+            "modulation-amount",
+            "modulation-rate",
+            "pitch",
+            "envelope-generator-attack",
+            "envelope-generator-release"
+          ]
+        },
+        "layer1": {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/part/properties/layer2/properties",
+              "properties": {
+                "left-right-pan": {
+                  "$ref": "#/$defs/control-value"
+                },
+                "send-amount": {
+                  "$ref": "#/$defs/control-value"
+                },
+                "bit-reduction-amount": {
+                  "$ref": "#/$defs/control-value"
+                },
+                "wave-folder-amount": {
+                  "$ref": "#/$defs/control-value"
+                },
+                "overdrive-gain": {
+                  "$ref": "#/$defs/control-value"
+                },
+                "pre-mix-gain-adjustment": {
+                  "$ref": "#/$defs/control-value"
+                }
+              }
+            }
+          ],
+          "required": [
+            "select",
+            "level",
+            "modulation-amount",
+            "modulation-rate",
+            "left-right-pan",
+            "pitch",
+            "envelope-generator-attack",
+            "envelope-generator-release",
+            "send-amount",
+            "bit-reduction-amount",
+            "wave-folder-amount",
+            "overdrive-gain",
+            "pre-mix-gain-adjustment"
+          ]
+        }
+      },
+      "required": [
+        "layer1"
+      ]
+    }
+  }
+}

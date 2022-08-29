@@ -11,7 +11,7 @@ In order ro run this application the following are items required:
 - KORG volca drum
 - MIDI port to connect volca drum device to.
 - Python, at least Python 3.6 is required.
-- The following Python packges need to be installed: `PySide6`, `mido`, `python-rtmidi`.
+- The following Python packges need to be installed: `PySide6`, `jsonschema`, `mido`, `python-rtmidi`.
 
 # Notes
 
