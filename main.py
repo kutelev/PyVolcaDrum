@@ -8,6 +8,7 @@ import mido
 
 import config
 import controls
+import tracks
 
 root_directory_path = os.path.abspath(os.path.dirname(os.path.relpath(__file__)))
 
@@ -67,6 +68,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             part_control.control_changed.connect(self.process_control_change)
         self.__waveguide_resonator_control = controls.WaveguideResonatorControls()
         layout.addWidget(self.__waveguide_resonator_control, 0, 6)
+        layout.addWidget(tracks.Timeline(), 1, 0, 1, 7)
         self.__waveguide_resonator_control.control_changed.connect(self.process_control_change)
         self.__port = mido.open_output(port_name)  # noqa: open_output is a dynamically generated thing.
 
