@@ -178,13 +178,13 @@ class Timeline(PySide6.QtWidgets.QWidget):
         play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>STEP COUNT</b>'))
         self.__step_count_control = PySide6.QtWidgets.QSpinBox()
         self.__step_count_control.setRange(16, 1024)
-        self.__step_count_control.valueChanged.connect(self.__resize_tracks)
+        self.__step_count_control.editingFinished.connect(self.__resize_tracks)
         play_controls_layout.addWidget(self.__step_count_control)
 
         play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>TEMPO</b>'))
         self.__tempo_control = PySide6.QtWidgets.QSpinBox()
         self.__tempo_control.setRange(60, 240)
-        self.__tempo_control.valueChanged.connect(self.__change_tempo)
+        self.__tempo_control.editingFinished.connect(self.__change_tempo)
         play_controls_layout.addWidget(self.__tempo_control)
 
         tracks_layout = PySide6.QtWidgets.QVBoxLayout()
@@ -199,12 +199,14 @@ class Timeline(PySide6.QtWidgets.QWidget):
         else:
             self.__tracks.stop()
 
-    def __resize_tracks(self, new_step_count: int) -> None:
+    def __resize_tracks(self) -> None:
+        sender: PySide6.QtWidgets.QSpinBox = self.sender()
         self.__play_button.setChecked(False)
-        self.__tracks.resize(new_step_count)
+        self.__tracks.resize(sender.value())
 
-    def __change_tempo(self, new_tempo: int) -> None:
-        self.__tracks.change_tempo(new_tempo)
+    def __change_tempo(self) -> None:
+        sender: PySide6.QtWidgets.QSpinBox = self.sender()
+        self.__tracks.change_tempo(sender.value())
 
     def store(self) -> dict:
         return {'tracks': self.__tracks.store()}
