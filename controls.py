@@ -164,6 +164,7 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
     def __init__(self, title: str):
         super().__init__()
         self.setTitle(title)
+        self.setStyleSheet('QGroupBox { font: bold }')
         self._controls: typing.List[typing.Union[Knob, Selector]] = []
 
     def add_knob(self, layout: PySide6.QtWidgets.QGridLayout, title: str, control_number: int, control_name: str, default_value: int, row: int, col: int) -> \
@@ -259,6 +260,7 @@ class PartControls(PySide6.QtWidgets.QGroupBox):
         common.check_int_value('part_number', part_number, 1, 6)
         super().__init__()
         self.setTitle(f'PART {part_number}')
+        self.setStyleSheet('QGroupBox { font: bold }')
         self.part_number = part_number
         layout = PySide6.QtWidgets.QVBoxLayout()
         self.setLayout(layout)

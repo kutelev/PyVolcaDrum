@@ -37,8 +37,11 @@ class Tracks(PySide6.QtWidgets.QWidget):
         layout = PySide6.QtWidgets.QGridLayout()
 
         for track_index in range(Tracks.__track_count):
-            label = PySide6.QtWidgets.QLabel(f'<b>TRACK {track_index + 1}</b>')
-            layout.addWidget(label, track_index, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
+            check_box = PySide6.QtWidgets.QCheckBox()
+            check_box.setText(f'TRACK {track_index + 1}')
+            check_box.setStyleSheet('QCheckBox { font: bold }')
+            check_box.setChecked(True)
+            layout.addWidget(check_box, track_index, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
         for track_index, step_index in itertools.product(range(Tracks.__track_count), range(initial_step_count)):
             layout.addWidget(Step(), track_index, step_index + 1)
         for step_index in range(initial_step_count):
@@ -103,7 +106,8 @@ class Tracks(PySide6.QtWidgets.QWidget):
         self.layout().itemAtPosition(Tracks.__track_count, step_index + 1).widget().setChecked(True)
 
     def __do_step(self) -> None:
-        for track_index in range(Tracks.__track_count):
+        enabled_tracks = [track_index for track_index in range(Tracks.__track_count) if self.layout().itemAtPosition(track_index, 0).widget().isChecked()]
+        for track_index in enabled_tracks:
             if self.layout().itemAtPosition(track_index, self.__current_step_index + 1).widget().isChecked():
                 self.note_on.emit(track_index + 1)
         self.__go_to((self.__current_step_index + 1) % self.__step_count)
@@ -112,6 +116,9 @@ class Tracks(PySide6.QtWidgets.QWidget):
         stored_values = {
             'step-count': self.__step_count,
             'tempo': self.tempo,
+            'enabled-tracks': [
+                track_index + 1 for track_index in range(Tracks.__track_count) if self.layout().itemAtPosition(track_index, 0).widget().isChecked()
+            ],
             'tracks': {f'track{track_index + 1}': [] for track_index in range(Tracks.__track_count)},
         }
         for track_index, step_index in itertools.product(range(Tracks.__track_count), range(self.__step_count)):
@@ -126,6 +133,9 @@ class Tracks(PySide6.QtWidgets.QWidget):
         else:
             return None
         tracks.__timer.setInterval(60000 // stored_values.get('tempo', 60))
+        enabled_tracks = stored_values.get('enabled-tracks', [])
+        for track_index in range(Tracks.__track_count):
+            tracks.layout().itemAtPosition(track_index, 0).widget().setChecked(track_index + 1 in enabled_tracks)
         if 'tracks' not in stored_values:
             return tracks
         for track_index in range(Tracks.__track_count):
