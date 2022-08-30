@@ -6,16 +6,13 @@ import PySide6.QtGui
 import PySide6.QtWidgets
 import mido
 
+import common
 import config
 import controls
 import tracks
 
-root_directory_path = os.path.abspath(os.path.dirname(os.path.relpath(__file__)))
-
 
 class PortSelectionDialog(PySide6.QtWidgets.QDialog):
-    config_path = os.path.join(root_directory_path, 'config.json')
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle('PyVolcaDrum: chose port')
@@ -46,16 +43,14 @@ class PortSelectionDialog(PySide6.QtWidgets.QDialog):
 
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
-        if not os.path.exists(PortSelectionDialog.config_path):
+        if not os.path.exists(common.config_path):
             return
-        stored_values = config.load_config(file_path=PortSelectionDialog.config_path)
+        stored_values = config.load_config(file_path=common.config_path)
         if 'port' in stored_values:
             self.port_selector.setCurrentText(stored_values['port'])
 
 
 class MainWindow(PySide6.QtWidgets.QMainWindow):
-    config_path = os.path.join(root_directory_path, 'config.json')
-
     def __init__(self, port_name: str):
         super().__init__()
         self.setWindowTitle('PyVolcaDrum')
@@ -68,17 +63,25 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             part_control.control_changed.connect(self.process_control_change)
         self.__waveguide_resonator_control = controls.WaveguideResonatorControls()
         layout.addWidget(self.__waveguide_resonator_control, 0, 6)
-        layout.addWidget(tracks.Timeline(), 1, 0, 1, 7)
         self.__waveguide_resonator_control.control_changed.connect(self.process_control_change)
+
+        self.__timeline = tracks.Timeline()
+        self.__timeline.note_on.connect(self.process_note_on)
+        layout.addWidget(self.__timeline, 1, 0, 1, 7)
+
         self.__port = mido.open_output(port_name)  # noqa: open_output is a dynamically generated thing.
 
     def __del__(self):
         self.__port.close()
 
     def process_control_change(self, control: int, value: int) -> None:
-        channel = 1 if self.sender() is self.__waveguide_resonator_control else self.__part_controls.index(self.sender())
-        print(f'channel={channel}, control={control}, value={value}')
-        self.__port.send(mido.Message('control_change', channel=channel, control=control, value=value))
+        channel_index = 0 if self.sender() is self.__waveguide_resonator_control else self.__part_controls.index(self.sender())
+        print(f'control_change, channel={channel_index + 1}, control={control}, value={value}')
+        self.__port.send(mido.Message('control_change', channel=channel_index, control=control, value=value))
+
+    def process_note_on(self, channel_number) -> None:
+        print(f'note_on, channel={channel_number}')
+        self.__port.send(mido.Message('note_on', channel=channel_number - 1))
 
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
@@ -91,14 +94,16 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
                 'parts': {f'part{i + 1}': self.__part_controls[i].store() for i in range(6)},
                 'waveguide-resonator': self.__waveguide_resonator_control.store(),
             },
+            'timeline': self.__timeline.store(),
         }
-        config.store_config(stored_values, MainWindow.config_path)
+        config.store_config(stored_values, common.config_path)
 
     def restore(self) -> None:
-        stored_values = config.load_config(file_path=MainWindow.config_path)
+        stored_values = config.load_config(file_path=common.config_path)
         for i in range(6):
             self.__part_controls[i].restore(stored_values.get('controls', {}).get('parts', {}).get(f'part{i + 1}', {}))
         self.__waveguide_resonator_control.restore(stored_values.get('controls', {}).get('waveguide-resonator', {}))
+        self.__timeline.restore(stored_values.get('timeline', {}))
 
 
 def main() -> int:

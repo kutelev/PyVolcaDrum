@@ -41,11 +41,65 @@
           ]
         }
       }
+    },
+    "timeline": {
+      "type": "object",
+      "properties": {
+        "tracks": {
+          "type": "object",
+          "properties": {
+            "step-count": {
+              "type": "integer",
+              "minimum": 16,
+              "maximum": 1024
+            },
+            "tracks": {
+              "type": "object",
+              "properties": {
+                "track1": {
+                  "$ref": "#/$defs/track-data"
+                },
+                "track2": {
+                  "$ref": "#/$defs/track-data"
+                },
+                "track3": {
+                  "$ref": "#/$defs/track-data"
+                },
+                "track4": {
+                  "$ref": "#/$defs/track-data"
+                },
+                "track5": {
+                  "$ref": "#/$defs/track-data"
+                },
+                "track6": {
+                  "$ref": "#/$defs/track-data"
+                }
+              },
+              "required": [
+                "track1",
+                "track2",
+                "track3",
+                "track4",
+                "track5",
+                "track6"
+              ]
+            }
+          },
+          "required": [
+            "step-count",
+            "tracks"
+          ]
+        }
+      },
+      "required": [
+        "tracks"
+      ]
     }
   },
   "required": [
     "port",
-    "controls"
+    "controls",
+    "timeline"
   ],
   "$defs": {
     "control-value": {
@@ -138,6 +192,13 @@
       "required": [
         "layer1"
       ]
+    },
+    "track-data" : {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
     }
   }
 }
