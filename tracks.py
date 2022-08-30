@@ -52,7 +52,7 @@ class Tracks(PySide6.QtWidgets.QWidget):
 
         self.__timer = PySide6.QtCore.QTimer()
         self.__timer.timeout.connect(self.__do_step)
-        self.__timer.setInterval(250)
+        self.change_tempo(60)
 
     def layout(self) -> PySide6.QtWidgets.QGridLayout:
         return super().layout()
@@ -80,6 +80,13 @@ class Tracks(PySide6.QtWidgets.QWidget):
                 widget.deleteLater()
         self.__step_count = new_step_count
 
+    @property
+    def tempo(self) -> int:
+        return 60000 // self.__timer.interval()
+
+    def change_tempo(self, new_tempo: int) -> None:
+        self.__timer.setInterval(60000 // new_tempo)
+
     def play(self) -> None:
         self.__timer.start()
 
@@ -104,6 +111,7 @@ class Tracks(PySide6.QtWidgets.QWidget):
     def store(self) -> dict:
         stored_values = {
             'step-count': self.__step_count,
+            'tempo': self.tempo,
             'tracks': {f'track{track_index + 1}': [] for track_index in range(Tracks.__track_count)},
         }
         for track_index, step_index in itertools.product(range(Tracks.__track_count), range(self.__step_count)):
@@ -117,6 +125,7 @@ class Tracks(PySide6.QtWidgets.QWidget):
             tracks = Tracks(stored_values['step-count'])
         else:
             return None
+        tracks.__timer.setInterval(60000 // stored_values.get('tempo', 60))
         if 'tracks' not in stored_values:
             return tracks
         for track_index in range(Tracks.__track_count):
@@ -147,18 +156,26 @@ class Timeline(PySide6.QtWidgets.QWidget):
 
         play_controls_layout = PySide6.QtWidgets.QHBoxLayout()
         play_icon = PySide6.QtGui.QIcon(os.path.join(common.resources_directory_path, 'play.svg'))
-        play_button = PySide6.QtWidgets.QToolButton()
-        play_button.setCheckable(True)
-        play_button.setIcon(play_icon)
-        play_button.toggled.connect(self.__process_play_button_push)
-        play_controls_layout.addWidget(play_button)
+        self.__play_button = PySide6.QtWidgets.QToolButton()
+        self.__play_button.setCheckable(True)
+        self.__play_button.setIcon(play_icon)
+        self.__play_button.toggled.connect(self.__process_play_button_push)
+        play_controls_layout.addWidget(self.__play_button)
+
         play_controls_layout.addSpacerItem(PySide6.QtWidgets.QSpacerItem(0, 0, PySide6.QtWidgets.QSizePolicy.Policy.MinimumExpanding,
                                                                          PySide6.QtWidgets.QSizePolicy.Policy.Maximum))
+
         play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>STEP COUNT</b>'))
         self.__step_count_control = PySide6.QtWidgets.QSpinBox()
         self.__step_count_control.setRange(16, 1024)
         self.__step_count_control.valueChanged.connect(self.__resize_tracks)
         play_controls_layout.addWidget(self.__step_count_control)
+
+        play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>TEMPO</b>'))
+        self.__tempo_control = PySide6.QtWidgets.QSpinBox()
+        self.__tempo_control.setRange(60, 240)
+        self.__tempo_control.valueChanged.connect(self.__change_tempo)
+        play_controls_layout.addWidget(self.__tempo_control)
 
         tracks_layout = PySide6.QtWidgets.QVBoxLayout()
         tracks_layout.addWidget(self.__scroll_area)
@@ -173,7 +190,11 @@ class Timeline(PySide6.QtWidgets.QWidget):
             self.__tracks.stop()
 
     def __resize_tracks(self, new_step_count: int) -> None:
+        self.__play_button.setChecked(False)
         self.__tracks.resize(new_step_count)
+
+    def __change_tempo(self, new_tempo: int) -> None:
+        self.__tracks.change_tempo(new_tempo)
 
     def store(self) -> dict:
         return {'tracks': self.__tracks.store()}
@@ -185,4 +206,7 @@ class Timeline(PySide6.QtWidgets.QWidget):
             self.__scroll_area.setWidget(restored_tracks)
             self.__tracks = restored_tracks
             old_tracks.deleteLater()
-        self.__step_count_control.setValue(self.__scroll_area.widget().step_count)
+        tracks: Tracks = self.__scroll_area.widget()  # noqa: we know that scroll area holds Tracks instance.
+        tracks.note_on.connect(self.note_on)
+        self.__step_count_control.setValue(tracks.step_count)
+        self.__tempo_control.setValue(tracks.tempo)

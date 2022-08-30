@@ -53,6 +53,11 @@
               "minimum": 16,
               "maximum": 1024
             },
+            "tempo": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 240
+            },
             "tracks": {
               "type": "object",
               "properties": {
@@ -87,6 +92,7 @@
           },
           "required": [
             "step-count",
+            "tempo",
             "tracks"
           ]
         }
