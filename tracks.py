@@ -115,7 +115,7 @@ class Tracks(PySide6.QtWidgets.QWidget):
     def store(self) -> dict:
         stored_values = {
             'step-count': self.__step_count,
-            'tempo': self.tempo,
+            'tempo': min(360, max(60, self.tempo)),
             'enabled-tracks': [
                 track_index + 1 for track_index in range(Tracks.__track_count) if self.layout().itemAtPosition(track_index, 0).widget().isChecked()
             ],
@@ -183,7 +183,7 @@ class Timeline(PySide6.QtWidgets.QWidget):
 
         play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>TEMPO</b>'))
         self.__tempo_control = PySide6.QtWidgets.QSpinBox()
-        self.__tempo_control.setRange(60, 240)
+        self.__tempo_control.setRange(60, 360)
         self.__tempo_control.editingFinished.connect(self.__change_tempo)
         play_controls_layout.addWidget(self.__tempo_control)
 

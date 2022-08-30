@@ -56,7 +56,7 @@
             "tempo": {
               "type": "integer",
               "minimum": 60,
-              "maximum": 240
+              "maximum": 360
             },
             "enabled-tracks": {
               "type": "array",
