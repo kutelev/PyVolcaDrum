@@ -16,4 +16,4 @@ def check_int_value(name: str, value: int, min_value: int, max_value: int) -> No
     if not isinstance(value, int):
         raise TypeError(f'{name} must be of type int')
     if not min_value <= value <= max_value:
-        raise TypeError(f'{name} must in the range from {min_value} to {max_value}')
+        raise ValueError(f'{name} must in the range from {min_value} to {max_value}')
