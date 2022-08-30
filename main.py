@@ -15,7 +15,7 @@ import tracks
 class PortSelectionDialog(PySide6.QtWidgets.QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('PyVolcaDrum: chose port')
+        self.setWindowTitle('PyVolcaDrum: choose port')
 
         self.port_selector = PySide6.QtWidgets.QComboBox()
         self.port_selector.addItem('')
