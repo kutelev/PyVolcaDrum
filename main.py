@@ -108,6 +108,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
 def main() -> int:
     application = PySide6.QtWidgets.QApplication(sys.argv)
+    application.setWheelScrollLines(1)
 
     port_selector = PortSelectionDialog()
     if port_selector.exec() != PySide6.QtWidgets.QDialog.Accepted:
