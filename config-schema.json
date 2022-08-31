@@ -42,80 +42,74 @@
         }
       }
     },
-    "timeline": {
-      "type": "object",
-      "properties": {
-        "parts": {
-          "type": "object",
-          "properties": {
-            "step-count": {
+    "properties": {
+      "parts": {
+        "type": "object",
+        "properties": {
+          "step-count": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 1024
+          },
+          "tempo": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 360
+          },
+          "enabled-parts": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
               "type": "integer",
-              "minimum": 16,
-              "maximum": 1024
-            },
-            "tempo": {
-              "type": "integer",
-              "minimum": 60,
-              "maximum": 360
-            },
-            "enabled-parts": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 6
-              }
-            },
-            "parts-data": {
-              "type": "object",
-              "properties": {
-                "part1": {
-                  "$ref": "#/$defs/part-data"
-                },
-                "part2": {
-                  "$ref": "#/$defs/part-data"
-                },
-                "part3": {
-                  "$ref": "#/$defs/part-data"
-                },
-                "part4": {
-                  "$ref": "#/$defs/part-data"
-                },
-                "part5": {
-                  "$ref": "#/$defs/part-data"
-                },
-                "part6": {
-                  "$ref": "#/$defs/part-data"
-                }
-              },
-              "required": [
-                "part1",
-                "part2",
-                "part3",
-                "part4",
-                "part5",
-                "part6"
-              ]
+              "minimum": 1,
+              "maximum": 6
             }
           },
-          "required": [
-            "step-count",
-            "tempo",
-            "enabled-parts",
-            "parts-data"
-          ]
-        }
-      },
-      "required": [
-        "parts"
-      ]
+          "parts-data": {
+            "type": "object",
+            "properties": {
+              "part1": {
+                "$ref": "#/$defs/part-data"
+              },
+              "part2": {
+                "$ref": "#/$defs/part-data"
+              },
+              "part3": {
+                "$ref": "#/$defs/part-data"
+              },
+              "part4": {
+                "$ref": "#/$defs/part-data"
+              },
+              "part5": {
+                "$ref": "#/$defs/part-data"
+              },
+              "part6": {
+                "$ref": "#/$defs/part-data"
+              }
+            },
+            "required": [
+              "part1",
+              "part2",
+              "part3",
+              "part4",
+              "part5",
+              "part6"
+            ]
+          }
+        },
+        "required": [
+          "step-count",
+          "tempo",
+          "enabled-parts",
+          "parts-data"
+        ]
+      }
     }
   },
   "required": [
     "port",
     "controls",
-    "timeline"
+    "parts"
   ],
   "$defs": {
     "control-value": {

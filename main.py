@@ -54,38 +54,87 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
     def __init__(self, port_name: str):
         super().__init__()
         self.setWindowTitle('PyVolcaDrum')
-        self.setCentralWidget(PySide6.QtWidgets.QWidget())
+
+        # Controls
         layout = PySide6.QtWidgets.QGridLayout()
-        self.centralWidget().setLayout(layout)
         self.__part_controls = [controls.PartControls(i) for i in range(1, 6 + 1)]
         for i, part_control in enumerate(self.__part_controls):
             layout.addWidget(part_control, 0, i)
-            part_control.control_changed.connect(self.process_control_change)
+            part_control.control_changed.connect(self.__process_control_change)
         self.__waveguide_resonator_control = controls.WaveguideResonatorControls()
         layout.addWidget(self.__waveguide_resonator_control, 0, 6)
-        self.__waveguide_resonator_control.control_changed.connect(self.process_control_change)
+        self.__waveguide_resonator_control.control_changed.connect(self.__process_control_change)
 
-        self.__timeline = parts.Timeline()
-        self.__timeline.note_on.connect(self.process_note_on)
-        layout.addWidget(self.__timeline, 1, 0, 1, 7)
+        # Parts data (timeline)
+        self.__parts = parts.Parts()
+        self.__parts.note_on.connect(self.__process_note_on)
+        self.__scroll_area = PySide6.QtWidgets.QScrollArea()
+        self.__scroll_area.setWidget(self.__parts)
+        self.__scroll_area.setWidgetResizable(True)
+        self.__scroll_area.setMinimumHeight(self.__scroll_area.sizeHint().height() + self.__scroll_area.horizontalScrollBar().height())
+        layout.addWidget(self.__scroll_area, 1, 0, 1, 7)
+
+        # Play controls
+        play_controls_layout = PySide6.QtWidgets.QHBoxLayout()
+        play_icon = PySide6.QtGui.QIcon(os.path.join(common.resources_directory_path, 'play.svg'))
+        self.__play_button = PySide6.QtWidgets.QToolButton()
+        self.__play_button.setCheckable(True)
+        self.__play_button.setIcon(play_icon)
+        self.__play_button.toggled.connect(self.__process_play_button_push)
+        play_controls_layout.addWidget(self.__play_button)
+        play_controls_layout.addSpacerItem(PySide6.QtWidgets.QSpacerItem(0, 0, PySide6.QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+                                                                         PySide6.QtWidgets.QSizePolicy.Policy.Maximum))
+        play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>STEP COUNT</b>'))
+        self.__step_count_control = PySide6.QtWidgets.QSpinBox()
+        self.__step_count_control.setRange(16, 1024)
+        self.__step_count_control.editingFinished.connect(self.__resize_parts)
+        play_controls_layout.addWidget(self.__step_count_control)
+        play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>TEMPO</b>'))
+        self.__tempo_control = PySide6.QtWidgets.QSpinBox()
+        self.__tempo_control.setRange(60, 360)
+        self.__tempo_control.editingFinished.connect(self.__change_tempo)
+        play_controls_layout.addWidget(self.__tempo_control)
+        layout.addLayout(play_controls_layout, 2, 0, 1, 7)
+
+        self.setCentralWidget(PySide6.QtWidgets.QWidget())
+        self.centralWidget().setLayout(layout)
 
         self.__port = mido.open_output(port_name)  # noqa: open_output is a dynamically generated thing.
 
     def __del__(self):
         self.__port.close()
 
-    def process_control_change(self, control: int, value: int) -> None:
+    def __process_control_change(self, control: int, value: int) -> None:
         channel_index = 0 if self.sender() is self.__waveguide_resonator_control else self.__part_controls.index(self.sender())
         print(f'control_change, channel={channel_index + 1}, control={control}, value={value}')
         self.__port.send(mido.Message('control_change', channel=channel_index, control=control, value=value))
 
-    def process_note_on(self, channel_number) -> None:
+    def __process_note_on(self, channel_number) -> None:
         print(f'note_on, channel={channel_number}')
         self.__port.send(mido.Message('note_on', channel=channel_number - 1))
+
+    def __process_play_button_push(self, checked: bool) -> None:
+        if checked:
+            self.__parts.play()
+        else:
+            self.__parts.stop()
+
+    def __resize_parts(self) -> None:
+        sender: PySide6.QtWidgets.QSpinBox = self.sender()
+        self.__play_button.setChecked(False)
+        self.__parts.resize(sender.value())
+
+    def __change_tempo(self) -> None:
+        sender: PySide6.QtWidgets.QSpinBox = self.sender()
+        self.__parts.change_tempo(sender.value())
 
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
         self.restore()
+
+    def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
+        self.__play_button.setChecked(False)
+        super().closeEvent(event)
 
     def store(self) -> None:
         stored_values = {
@@ -94,7 +143,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
                 'parts': {f'part{i + 1}': self.__part_controls[i].store() for i in range(6)},
                 'waveguide-resonator': self.__waveguide_resonator_control.store(),
             },
-            'timeline': self.__timeline.store(),
+            'parts': self.__parts.store(),
         }
         config.store_config(stored_values, common.config_path)
 
@@ -103,7 +152,16 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         for i in range(6):
             self.__part_controls[i].restore(stored_values.get('controls', {}).get('parts', {}).get(f'part{i + 1}', {}))
         self.__waveguide_resonator_control.restore(stored_values.get('controls', {}).get('waveguide-resonator', {}))
-        self.__timeline.restore(stored_values.get('timeline', {}))
+        restored_parts = self.__parts.restore(stored_values.get('parts', {}))
+        if restored_parts is not None:
+            old_parts = self.__scroll_area.takeWidget()
+            self.__scroll_area.setWidget(restored_parts)
+            self.__parts = restored_parts
+            old_parts.deleteLater()
+            parts: Parts = self.__scroll_area.widget()  # noqa: we know that scroll area holds Parts instance.
+            parts.note_on.connect(self.__process_note_on)
+        self.__step_count_control.setValue(self.__parts.step_count)
+        self.__tempo_control.setValue(self.__parts.tempo)
 
 
 def main() -> int:
