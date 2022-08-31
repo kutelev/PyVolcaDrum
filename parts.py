@@ -1,5 +1,4 @@
 import itertools
-import os
 import typing
 
 import PySide6.QtCore
@@ -7,20 +6,8 @@ import PySide6.QtGui
 import PySide6.QtWidgets
 
 import common
-import controls
 
-__all__ = ['Timeline']
-
-
-class FineTuningDialog(PySide6.QtWidgets.QDialog):
-    def __init__(self, part_number: int):
-        common.check_int_value('part_number', part_number, 1, 6)
-        super().__init__()
-        self.setWindowTitle('PyVolcaDrum: fine tuning')
-        part_controls = controls.PartControls(part_number)
-        layout = PySide6.QtWidgets.QGridLayout()
-        layout.addWidget(part_controls, 0, 0)
-        self.setLayout(layout)
+__all__ = ['Parts']
 
 
 class Step(PySide6.QtWidgets.QToolButton):
@@ -40,6 +27,7 @@ class Dot(PySide6.QtWidgets.QRadioButton):
 
 class Parts(PySide6.QtWidgets.QWidget):
     note_on = PySide6.QtCore.Signal(int)  # Channel number is sent (range from 1 to 6 inclusive).
+    step_context_requested = PySide6.QtCore.Signal()
 
     __part_count = 6
 
@@ -59,12 +47,12 @@ class Parts(PySide6.QtWidgets.QWidget):
             layout.addWidget(check_box, part_index, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
         for part_index, step_index in itertools.product(range(Parts.__part_count), range(initial_step_count)):
             step = Step(part_index + 1)
-            step.customContextMenuRequested.connect(self.__show_tune_dialog)
+            step.customContextMenuRequested.connect(self.step_context_requested)
             layout.addWidget(step, part_index, step_index + 1)
         for step_index in range(initial_step_count):
             dot = Dot(step_index)
             dot.clicked.connect(self.__process_dot_click)
-            dot.customContextMenuRequested.connect(self.__show_tune_dialog)
+            dot.customContextMenuRequested.connect(self.step_context_requested)
             layout.addWidget(dot, Parts.__part_count, step_index + 1, 1, 1, PySide6.QtCore.Qt.AlignCenter)
         layout.itemAtPosition(Parts.__part_count, 1).widget().setChecked(True)
 
@@ -90,7 +78,7 @@ class Parts(PySide6.QtWidgets.QWidget):
         if new_step_count > self.__step_count:
             for part_index, step_index in itertools.product(range(Parts.__part_count), range(self.__step_count, new_step_count)):
                 step = Step(part_index + 1)
-                step.customContextMenuRequested.connect(self.__show_tune_dialog)
+                step.customContextMenuRequested.connect(self.step_context_requested)
                 self.layout().addWidget(step, part_index, step_index + 1)
             for step_index in range(self.__step_count, new_step_count):
                 dot = Dot(step_index)
@@ -131,11 +119,6 @@ class Parts(PySide6.QtWidgets.QWidget):
             if self.layout().itemAtPosition(part_index, self.__current_step_index + 1).widget().isChecked():
                 self.note_on.emit(part_index + 1)
         self.__go_to((self.__current_step_index + 1) % self.__step_count)
-
-    def __show_tune_dialog(self) -> None:
-        sender: Step = self.sender()
-        fine_tuning_dialog = FineTuningDialog(sender.property('part-number'))
-        fine_tuning_dialog.exec()
 
     def store(self) -> dict:
         stored_values = {

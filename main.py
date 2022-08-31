@@ -21,7 +21,7 @@ class PortSelectionDialog(PySide6.QtWidgets.QDialog):
         self.port_selector.addItem('')
         for port_name in mido.get_output_names():  # noqa: get_output_names is a dynamically generated thing.
             self.port_selector.addItem(port_name)
-        self.port_selector.currentTextChanged.connect(self.port_selected)
+        self.port_selector.currentTextChanged.connect(self.__port_selected)
 
         self.ok_button = PySide6.QtWidgets.QPushButton('OK')
         self.ok_button.hide()
@@ -34,7 +34,7 @@ class PortSelectionDialog(PySide6.QtWidgets.QDialog):
 
         self.setFixedSize(self.sizeHint())
 
-    def port_selected(self) -> None:
+    def __port_selected(self) -> None:
         self.ok_button.setVisible(bool(self.port_selector.currentText()))
         self.setFixedSize(self.sizeHint())
 
@@ -68,6 +68,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         # Parts data (timeline)
         self.__parts = parts.Parts()
         self.__parts.note_on.connect(self.__process_note_on)
+        self.__parts.step_context_requested.connect(self.__show_override_controls_dialog)
         self.__scroll_area = PySide6.QtWidgets.QScrollArea()
         self.__scroll_area.setWidget(self.__parts)
         self.__scroll_area.setWidgetResizable(True)
@@ -128,6 +129,12 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         sender: PySide6.QtWidgets.QSpinBox = self.sender()
         self.__parts.change_tempo(sender.value())
 
+    def __show_override_controls_dialog(self) -> None:
+        sender: parts.Step = self.sender().sender()
+        original_part_controls = self.__part_controls[sender.property('part-number') - 1]
+        fine_tuning_dialog = controls.PartOverrideControls(original_part_controls)
+        fine_tuning_dialog.exec()
+
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
         self.restore()
@@ -160,6 +167,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             old_parts.deleteLater()
             parts: Parts = self.__scroll_area.widget()  # noqa: we know that scroll area holds Parts instance.
             parts.note_on.connect(self.__process_note_on)
+            parts.step_context_requested.connect(self.__show_override_controls_dialog)
         self.__step_count_control.setValue(self.__parts.step_count)
         self.__tempo_control.setValue(self.__parts.tempo)
 

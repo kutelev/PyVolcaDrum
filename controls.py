@@ -199,22 +199,28 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
 class LayerControls(GroupOfControls):
     layer_toggled = PySide6.QtCore.Signal()
 
-    def __init__(self, part_number: int, layer_number: int):
+    def __init__(self, part_number: int, layer_number: int, override_controls: bool):
         common.check_int_value('part_number', part_number, 1, 6)
         common.check_int_value('layer_number', layer_number, 1, 2)
         super().__init__(f'LAYER {layer_number}')
         self.layer_number = layer_number
         self.part_number = part_number
 
+        layout = PySide6.QtWidgets.QVBoxLayout()
         knobs_layout = PySide6.QtWidgets.QGridLayout()
-        select_control = SelectControl(14 + layer_number - 1)  # SELECT1 or SELECT2
-        self._controls = [
-            select_control,  # SELECT1 or SELECT2
+
+        if not override_controls:
+            select_control = SelectControl(14 + layer_number - 1)  # SELECT1 or SELECT2
+            select_control.valueChanged.connect(self._process_control_change)
+            layout.addWidget(select_control)
+            self._controls.append(select_control)
+
+        self._controls.extend([
             # Row 0
             self._add_knob(knobs_layout, 'LEVEL', 17 + layer_number - 1, 'level', 64, 0, 0),  # LEVEL1 or LEVEL2
             self._add_knob(knobs_layout, 'AMOUNT', 29 + layer_number - 1, 'modulation-amount', 64, 0, 1),  # MODAMT1 or MODAMT2
             self._add_knob(knobs_layout, 'RATE', 46 + layer_number - 1, 'modulation-rate', 64, 0, 2),  # MODRATE1 or MODRATE2
-        ]
+        ])
         if layer_number == 1:
             self._controls.extend([
                 # Row 0
@@ -238,11 +244,8 @@ class LayerControls(GroupOfControls):
                 self._add_knob(knobs_layout, 'GAN', 52, 'pre-mix-gain-adjustment', 127, 4, 3),  # DRY GAIN
             ])
 
-        select_control.valueChanged.connect(self._process_control_change)
         self.toggled.connect(self.layer_toggled)
 
-        layout = PySide6.QtWidgets.QVBoxLayout()
-        layout.addWidget(select_control)
         layout.addLayout(knobs_layout)
         self.setLayout(layout)
 
@@ -256,28 +259,32 @@ class LayerControls(GroupOfControls):
 class PartControls(PySide6.QtWidgets.QGroupBox):
     control_changed = PySide6.QtCore.Signal(int, int)
 
-    def __init__(self, part_number: int):
+    def __init__(self, part_number: int, override_controls: bool = False):
         common.check_int_value('part_number', part_number, 1, 6)
         super().__init__()
         self.setTitle(f'PART {part_number}')
         self.setStyleSheet('QGroupBox { font: bold }')
-        self.part_number = part_number
+        self.__part_number = part_number
         layout = PySide6.QtWidgets.QVBoxLayout()
         self.setLayout(layout)
-        self.layer_controls = [LayerControls(part_number, i) for i in range(1, 2 + 1)]
+        self.layer_controls = [LayerControls(part_number, i, override_controls) for i in range(1, 2 + 1)]
         for i, layer_control in enumerate(self.layer_controls):
             layer_control.setCheckable(i == 1)
             layer_control.setChecked(i == 0)
             layout.addWidget(layer_control)
-            layer_control.control_changed.connect(self.process_control_change)
-        self.layer_controls[1].layer_toggled.connect(self.process_layer_toggle)
+            layer_control.control_changed.connect(self.__process_control_change)
+        self.layer_controls[1].layer_toggled.connect(self.__process_layer_toggle)
 
-    def process_control_change(self, control: int, value: int) -> None:
+    @property
+    def part_number(self) -> int:
+        return self.__part_number
+
+    def __process_control_change(self, control: int, value: int) -> None:
         self.control_changed.emit(control, value)
         if self.sender() is self.layer_controls[0] and not self.layer_controls[1].isChecked():
             self.layer_controls[1].sync(self.layer_controls[0])
 
-    def process_layer_toggle(self) -> None:
+    def __process_layer_toggle(self) -> None:
         self.layer_controls[1].sync(self.layer_controls[0])
 
     def store(self) -> dict:
@@ -293,6 +300,17 @@ class PartControls(PySide6.QtWidgets.QGroupBox):
         self.layer_controls[0].restore(stored_values.get('layer1', {}))
         self.layer_controls[1].restore(stored_values.get('layer2' if 'layer2' in stored_values else 'layer1', {}))
         self.layer_controls[1].setChecked('layer2' in stored_values)
+
+
+class PartOverrideControls(PySide6.QtWidgets.QDialog):
+    def __init__(self, original_part_controls: PartControls):
+        super().__init__()
+        self.setWindowTitle('PyVolcaDrum: override controls')
+        part_controls = PartControls(original_part_controls.part_number, True)
+        part_controls.restore(original_part_controls.store())
+        layout = PySide6.QtWidgets.QGridLayout()
+        layout.addWidget(part_controls, 0, 0)
+        self.setLayout(layout)
 
 
 class WaveguideResonatorControls(GroupOfControls):
