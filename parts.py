@@ -17,6 +17,14 @@ class Step(PySide6.QtWidgets.QToolButton):
         self.setCheckable(True)
         self.setContextMenuPolicy(PySide6.QtCore.Qt.CustomContextMenu)
         self.setProperty('part-number', part_number)
+        self.setText('-')
+
+    def set_overridden_values(self, overridden_values: typing.Optional[dict]) -> None:
+        self.setProperty('overridden-values', overridden_values)
+        self.setText('*' if bool(overridden_values) else '-')
+
+    def get_overridden_values(self) -> typing.Optional[dict]:
+        return self.property('overridden-values')
 
 
 class Dot(PySide6.QtWidgets.QRadioButton):
@@ -28,6 +36,7 @@ class Dot(PySide6.QtWidgets.QRadioButton):
 class Parts(PySide6.QtWidgets.QWidget):
     note_on = PySide6.QtCore.Signal(int)  # Channel number is sent (range from 1 to 6 inclusive).
     step_context_requested = PySide6.QtCore.Signal()
+    overridden_values_found = PySide6.QtCore.Signal(int, dict)  # Sends channel number and overridden values.
 
     __part_count = 6
 
@@ -116,7 +125,11 @@ class Parts(PySide6.QtWidgets.QWidget):
     def __do_step(self) -> None:
         enabled_parts = [part_index for part_index in range(Parts.__part_count) if self.layout().itemAtPosition(part_index, 0).widget().isChecked()]
         for part_index in enabled_parts:
-            if self.layout().itemAtPosition(part_index, self.__current_step_index + 1).widget().isChecked():
+            step: Step = self.layout().itemAtPosition(part_index, self.__current_step_index + 1).widget()
+            overridden_values = step.get_overridden_values()
+            if overridden_values:
+                self.overridden_values_found.emit(part_index + 1, overridden_values)
+            if step.isChecked():
                 self.note_on.emit(part_index + 1)
         self.__go_to((self.__current_step_index + 1) % self.__step_count)
 

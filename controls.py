@@ -62,7 +62,7 @@ class Selector(PySide6.QtWidgets.QWidget):
         button_group.buttonToggled.connect(self._process_control_change)
         return button_group
 
-    def _process_control_change(self, checked: bool) -> None:
+    def _process_control_change(self, button: PySide6.QtWidgets.QPushButton, checked: bool) -> None:
         raise NotImplemented
 
     def setValue(self, value) -> None:  # noqa: Qt notation is used intentionally.
@@ -115,7 +115,7 @@ class SelectControl(Selector):
     def __normalized_combination_index(self) -> int:
         return (127 * self.__combination_index + self.__max_combination_count_index - 1) // self.__max_combination_count_index
 
-    def _process_control_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
+    def _process_control_change(self, button: PySide6.QtWidgets.QPushButton, checked: bool) -> None:
         if not checked:
             return
         self.setValue(self.__normalized_combination_index)
@@ -143,7 +143,7 @@ class ResonatorModelControl(Selector):
         super().__init__(control_number, 'resonator-model')
         self.__resonator_model_selector = self._add_row_of_tool_buttons('RES', 0, ['Tube', 'String'], 'waveguide-resonator')
 
-    def _process_control_change(self, button: typing.Optional[PySide6.QtWidgets.QPushButton], checked: bool) -> None:
+    def _process_control_change(self, button: PySide6.QtWidgets.QPushButton, checked: bool) -> None:
         if not checked:
             return
         self.setValue(self.__resonator_model_selector.checkedId() * 127)
@@ -176,24 +176,39 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
         return knob
 
     @staticmethod
-    def _restore_control(control: typing.Union[PySide6.QtWidgets.QDial, Selector], value: int, force: bool) -> None:
+    def _restore_control(control: typing.Union[PySide6.QtWidgets.QDial, Selector], value: int, is_overridden: bool, force: bool) -> None:
         if control.value() != value:
             control.setValue(value)
         elif force:
             # Force sending signal to the device even if local value is up-to-date.
             # This is only required when settings are restored from a configuration file (on application start).
             control.valueChanged.emit(control.value())
+        control.setProperty('is-overridden', is_overridden)
 
     def _process_control_change(self) -> None:
-        sender = self.sender()
-        self.control_changed.emit(sender.property('control-number'), sender.value())
+        control = self.sender()
+        control.setProperty('is-overridden', True)
+        self.control_changed.emit(control.property('control-number'), control.value())
 
-    def store(self) -> dict:
-        return {control.property('control-name'): control.value() for control in self._controls}
+    def store(self, overrides_only: bool = False) -> dict:
+        return {control.property('control-name'): control.value() for control in self._controls if not overrides_only or control.property('is-overridden')}
 
-    def restore(self, stored_values: typing.Optional[dict], force: bool = True) -> None:
+    def restore(self, stored_values: typing.Optional[dict], overridden_values: typing.Optional[dict] = None, force: bool = True) -> None:
+        if overridden_values is None:
+            overridden_values = {}
         for control in self._controls:
-            self._restore_control(control, stored_values.get(control.property('control-name'), control.property('default-value')), force)
+            control_name = control.property('control-name')
+            is_overridden = control_name in overridden_values
+            default_value = stored_values.get(control_name, control.property('default-value'))
+            value = overridden_values.get(control_name, default_value)
+            self._restore_control(control, value, is_overridden, force)
+            control.setProperty('default-value', default_value)
+
+    def send_overridden_values(self, overridden_values: dict) -> None:
+        for control in self._controls:
+            control_name = control.property('control-name')
+            if control_name in overridden_values:
+                self.control_changed.emit(control.property('control-number'), overridden_values[control_name])
 
 
 class LayerControls(GroupOfControls):
@@ -250,10 +265,7 @@ class LayerControls(GroupOfControls):
         self.setLayout(layout)
 
     def sync(self, other) -> None:
-        self.restore(other.store(), False)
-
-    def restore(self, stored_values: typing.Optional[dict], force: bool = True) -> None:
-        super().restore(stored_values, force)
+        self.restore(other.store(), None, False)
 
 
 class PartControls(PySide6.QtWidgets.QGroupBox):
@@ -287,30 +299,45 @@ class PartControls(PySide6.QtWidgets.QGroupBox):
     def __process_layer_toggle(self) -> None:
         self.layer_controls[1].sync(self.layer_controls[0])
 
-    def store(self) -> dict:
-        stored_values = {'layer1': self.layer_controls[0].store()}
-        if self.layer_controls[1].isChecked():
-            stored_values['layer2'] = self.layer_controls[1].store()
+    def get_overridden_values(self) -> typing.Optional[dict]:
+        overridden_values = self.store(True)
+        return overridden_values if len(overridden_values) > 0 else None
+
+    def store(self, overridden_values_only: bool = False) -> dict:
+        stored_values = {'layer1': self.layer_controls[0].store(overridden_values_only)}
+        if self.layer_controls[1].isChecked() or overridden_values_only:
+            stored_values['layer2'] = self.layer_controls[1].store(overridden_values_only)
+        stored_values = {layer: stored_values[layer] for layer in ('layer1', 'layer2') if len(stored_values.get(layer, {})) > 0}
         return stored_values
 
-    def restore(self, stored_values) -> None:
+    def restore(self, stored_values: dict, overrides: typing.Optional[dict] = None) -> None:
+        if overrides is None:
+            overrides = {}
         self.layer_controls[1].blockSignals(True)
         self.layer_controls[1].setChecked(True)
         self.layer_controls[1].blockSignals(False)
-        self.layer_controls[0].restore(stored_values.get('layer1', {}))
-        self.layer_controls[1].restore(stored_values.get('layer2' if 'layer2' in stored_values else 'layer1', {}))
+        self.layer_controls[0].restore(stored_values.get('layer1', {}), overrides.get('layer1', {}))
+        self.layer_controls[1].restore(stored_values.get('layer2' if 'layer2' in stored_values else 'layer1', {}), overrides.get('layer2', {}))
         self.layer_controls[1].setChecked('layer2' in stored_values)
+
+    def send_overridden_values(self, overridden_values: dict) -> None:
+        for layer_index, layer_name in enumerate(('layer1', 'layer2')):
+            if layer_name in overridden_values:
+                self.layer_controls[layer_index].send_overridden_values(overridden_values[layer_name])
 
 
 class PartOverrideControls(PySide6.QtWidgets.QDialog):
-    def __init__(self, original_part_controls: PartControls):
+    def __init__(self, original_part_controls: PartControls, overrides: dict):
         super().__init__()
         self.setWindowTitle('PyVolcaDrum: override controls')
-        part_controls = PartControls(original_part_controls.part_number, True)
-        part_controls.restore(original_part_controls.store())
+        self.part_controls = PartControls(original_part_controls.part_number, True)
+        self.part_controls.restore(original_part_controls.store(), overrides)
         layout = PySide6.QtWidgets.QGridLayout()
-        layout.addWidget(part_controls, 0, 0)
+        layout.addWidget(self.part_controls, 0, 0)
         self.setLayout(layout)
+
+    def get_overridden_values(self) -> typing.Optional[dict]:
+        return self.part_controls.get_overridden_values()
 
 
 class WaveguideResonatorControls(GroupOfControls):

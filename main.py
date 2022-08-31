@@ -68,6 +68,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         # Parts data (timeline)
         self.__parts = parts.Parts()
         self.__parts.note_on.connect(self.__process_note_on)
+        self.__parts.overridden_values_found.connect(self.__process_overridden_values)
         self.__parts.step_context_requested.connect(self.__show_override_controls_dialog)
         self.__scroll_area = PySide6.QtWidgets.QScrollArea()
         self.__scroll_area.setWidget(self.__parts)
@@ -110,9 +111,13 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         print(f'control_change, channel={channel_index + 1}, control={control}, value={value}')
         self.__port.send(mido.Message('control_change', channel=channel_index, control=control, value=value))
 
-    def __process_note_on(self, channel_number) -> None:
+    def __process_note_on(self, channel_number: int) -> None:
         print(f'note_on, channel={channel_number}')
         self.__port.send(mido.Message('note_on', channel=channel_number - 1))
+
+    def __process_overridden_values(self, channel_number: int, overridden_values: dict) -> None:
+        print(f'channel_number={channel_number}, overridden_values={overridden_values}')
+        self.__part_controls[channel_number - 1].send_overridden_values(overridden_values)
 
     def __process_play_button_push(self, checked: bool) -> None:
         if checked:
@@ -130,10 +135,13 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.__parts.change_tempo(sender.value())
 
     def __show_override_controls_dialog(self) -> None:
-        sender: parts.Step = self.sender().sender()
-        original_part_controls = self.__part_controls[sender.property('part-number') - 1]
-        fine_tuning_dialog = controls.PartOverrideControls(original_part_controls)
+        step: parts.Step = self.sender().sender()
+        original_part_controls = self.__part_controls[step.property('part-number') - 1]
+        overridden_values = step.property('overridden-values')
+        fine_tuning_dialog = controls.PartOverrideControls(original_part_controls, overridden_values)
         fine_tuning_dialog.exec()
+        overridden_values = fine_tuning_dialog.get_overridden_values()
+        step.set_overridden_values(overridden_values)
 
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
@@ -165,9 +173,10 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             self.__scroll_area.setWidget(restored_parts)
             self.__parts = restored_parts
             old_parts.deleteLater()
-            parts: Parts = self.__scroll_area.widget()  # noqa: we know that scroll area holds Parts instance.
-            parts.note_on.connect(self.__process_note_on)
-            parts.step_context_requested.connect(self.__show_override_controls_dialog)
+            new_parts: parts.Parts = self.__scroll_area.widget()  # noqa: we know that scroll area holds Parts instance.
+            new_parts.note_on.connect(self.__process_note_on)
+            new_parts.overridden_values_found.connect(self.__process_overridden_values)
+            new_parts.step_context_requested.connect(self.__show_override_controls_dialog)
         self.__step_count_control.setValue(self.__parts.step_count)
         self.__tempo_control.setValue(self.__parts.tempo)
 
