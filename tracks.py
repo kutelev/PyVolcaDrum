@@ -38,7 +38,7 @@ class Tracks(PySide6.QtWidgets.QWidget):
 
         for track_index in range(Tracks.__track_count):
             check_box = PySide6.QtWidgets.QCheckBox()
-            check_box.setText(f'TRACK {track_index + 1}')
+            check_box.setText(f'PART {track_index + 1}')
             check_box.setStyleSheet('QCheckBox { font: bold }')
             check_box.setChecked(True)
             layout.addWidget(check_box, track_index, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
