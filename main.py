@@ -9,7 +9,7 @@ import mido
 import common
 import config
 import controls
-import tracks
+import parts
 
 
 class PortSelectionDialog(PySide6.QtWidgets.QDialog):
@@ -23,7 +23,7 @@ class PortSelectionDialog(PySide6.QtWidgets.QDialog):
             self.port_selector.addItem(port_name)
         self.port_selector.currentTextChanged.connect(self.port_selected)
 
-        self.ok_button = PySide6.QtWidgets.QPushButton('Ok')
+        self.ok_button = PySide6.QtWidgets.QPushButton('OK')
         self.ok_button.hide()
         self.ok_button.clicked.connect(self.accept)
 
@@ -65,7 +65,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         layout.addWidget(self.__waveguide_resonator_control, 0, 6)
         self.__waveguide_resonator_control.control_changed.connect(self.process_control_change)
 
-        self.__timeline = tracks.Timeline()
+        self.__timeline = parts.Timeline()
         self.__timeline.note_on.connect(self.process_note_on)
         layout.addWidget(self.__timeline, 1, 0, 1, 7)
 

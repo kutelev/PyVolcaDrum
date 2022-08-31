@@ -45,7 +45,7 @@
     "timeline": {
       "type": "object",
       "properties": {
-        "tracks": {
+        "parts": {
           "type": "object",
           "properties": {
             "step-count": {
@@ -58,7 +58,7 @@
               "minimum": 60,
               "maximum": 360
             },
-            "enabled-tracks": {
+            "enabled-parts": {
               "type": "array",
               "uniqueItems": true,
               "items": {
@@ -67,48 +67,48 @@
                 "maximum": 6
               }
             },
-            "tracks": {
+            "parts-data": {
               "type": "object",
               "properties": {
-                "track1": {
-                  "$ref": "#/$defs/track-data"
+                "part1": {
+                  "$ref": "#/$defs/part-data"
                 },
-                "track2": {
-                  "$ref": "#/$defs/track-data"
+                "part2": {
+                  "$ref": "#/$defs/part-data"
                 },
-                "track3": {
-                  "$ref": "#/$defs/track-data"
+                "part3": {
+                  "$ref": "#/$defs/part-data"
                 },
-                "track4": {
-                  "$ref": "#/$defs/track-data"
+                "part4": {
+                  "$ref": "#/$defs/part-data"
                 },
-                "track5": {
-                  "$ref": "#/$defs/track-data"
+                "part5": {
+                  "$ref": "#/$defs/part-data"
                 },
-                "track6": {
-                  "$ref": "#/$defs/track-data"
+                "part6": {
+                  "$ref": "#/$defs/part-data"
                 }
               },
               "required": [
-                "track1",
-                "track2",
-                "track3",
-                "track4",
-                "track5",
-                "track6"
+                "part1",
+                "part2",
+                "part3",
+                "part4",
+                "part5",
+                "part6"
               ]
             }
           },
           "required": [
             "step-count",
             "tempo",
-            "enabled-tracks",
-            "tracks"
+            "enabled-parts",
+            "parts-data"
           ]
         }
       },
       "required": [
-        "tracks"
+        "parts"
       ]
     }
   },
@@ -209,7 +209,7 @@
         "layer1"
       ]
     },
-    "track-data": {
+    "part-data": {
       "type": "array",
       "uniqueItems": true,
       "items": {

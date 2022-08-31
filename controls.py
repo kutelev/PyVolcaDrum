@@ -167,16 +167,16 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
         self.setStyleSheet('QGroupBox { font: bold }')
         self._controls: typing.List[typing.Union[Knob, Selector]] = []
 
-    def add_knob(self, layout: PySide6.QtWidgets.QGridLayout, title: str, control_number: int, control_name: str, default_value: int, row: int, col: int) -> \
+    def _add_knob(self, layout: PySide6.QtWidgets.QGridLayout, title: str, control_number: int, control_name: str, default_value: int, row: int, col: int) -> \
             Knob:
         layout.addWidget(PySide6.QtWidgets.QLabel(f'<b>{title}</b>'), row, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignBottom)
         knob = Knob(control_number, control_name, default_value)
-        knob.valueChanged.connect(self.process_control_change)
+        knob.valueChanged.connect(self._process_control_change)
         layout.addWidget(knob, row + 1, col, 1, 1, PySide6.QtCore.Qt.AlignCenter | PySide6.QtCore.Qt.AlignTop)
         return knob
 
     @staticmethod
-    def restore_control(control: typing.Union[PySide6.QtWidgets.QDial, Selector], value: int, force: bool) -> None:
+    def _restore_control(control: typing.Union[PySide6.QtWidgets.QDial, Selector], value: int, force: bool) -> None:
         if control.value() != value:
             control.setValue(value)
         elif force:
@@ -184,7 +184,7 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
             # This is only required when settings are restored from a configuration file (on application start).
             control.valueChanged.emit(control.value())
 
-    def process_control_change(self) -> None:
+    def _process_control_change(self) -> None:
         sender = self.sender()
         self.control_changed.emit(sender.property('control-number'), sender.value())
 
@@ -193,7 +193,7 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
 
     def restore(self, stored_values: typing.Optional[dict], force: bool = True) -> None:
         for control in self._controls:
-            self.restore_control(control, stored_values.get(control.property('control-name'), control.property('default-value')), force)
+            self._restore_control(control, stored_values.get(control.property('control-name'), control.property('default-value')), force)
 
 
 class LayerControls(GroupOfControls):
@@ -211,34 +211,34 @@ class LayerControls(GroupOfControls):
         self._controls = [
             select_control,  # SELECT1 or SELECT2
             # Row 0
-            self.add_knob(knobs_layout, 'LEVEL', 17 + layer_number - 1, 'level', 64, 0, 0),  # LEVEL1 or LEVEL2
-            self.add_knob(knobs_layout, 'AMOUNT', 29 + layer_number - 1, 'modulation-amount', 64, 0, 1),  # MODAMT1 or MODAMT2
-            self.add_knob(knobs_layout, 'RATE', 46 + layer_number - 1, 'modulation-rate', 64, 0, 2),  # MODRATE1 or MODRATE2
+            self._add_knob(knobs_layout, 'LEVEL', 17 + layer_number - 1, 'level', 64, 0, 0),  # LEVEL1 or LEVEL2
+            self._add_knob(knobs_layout, 'AMOUNT', 29 + layer_number - 1, 'modulation-amount', 64, 0, 1),  # MODAMT1 or MODAMT2
+            self._add_knob(knobs_layout, 'RATE', 46 + layer_number - 1, 'modulation-rate', 64, 0, 2),  # MODRATE1 or MODRATE2
         ]
         if layer_number == 1:
             self._controls.extend([
                 # Row 0
-                self.add_knob(knobs_layout, 'PAN', 10, 'left-right-pan', 64, 0, 3),  # PAN
+                self._add_knob(knobs_layout, 'PAN', 10, 'left-right-pan', 64, 0, 3),  # PAN
             ])
         self._controls.extend([
             # Row 2
-            self.add_knob(knobs_layout, 'PITCH', 26 + layer_number - 1, 'pitch', 32, 2, 0),  # PITCH1 or PITCH2
-            self.add_knob(knobs_layout, 'ATTACK', 20 + layer_number - 1, 'envelope-generator-attack', 64, 2, 1),  # EGATT1 or EGATT2
-            self.add_knob(knobs_layout, 'RELEASE', 23 + layer_number - 1, 'envelope-generator-release', 64, 2, 2),  # EGREL1 or EGREL2
+            self._add_knob(knobs_layout, 'PITCH', 26 + layer_number - 1, 'pitch', 32, 2, 0),  # PITCH1 or PITCH2
+            self._add_knob(knobs_layout, 'ATTACK', 20 + layer_number - 1, 'envelope-generator-attack', 64, 2, 1),  # EGATT1 or EGATT2
+            self._add_knob(knobs_layout, 'RELEASE', 23 + layer_number - 1, 'envelope-generator-release', 64, 2, 2),  # EGREL1 or EGREL2
         ])
 
         if layer_number == 1:
             self._controls.extend([
                 # Row 2
-                self.add_knob(knobs_layout, 'SEND', 103, 'send-amount', 0, 2, 3),  # SEND
+                self._add_knob(knobs_layout, 'SEND', 103, 'send-amount', 0, 2, 3),  # SEND
                 # Row 4
-                self.add_knob(knobs_layout, 'BIT', 49, 'bit-reduction-amount', 0, 4, 0),  # BIT RED
-                self.add_knob(knobs_layout, 'FLD', 50, 'wave-folder-amount', 0, 4, 1),  # FOLD
-                self.add_knob(knobs_layout, 'DRV', 51, 'overdrive-gain', 0, 4, 2),  # DRIVE
-                self.add_knob(knobs_layout, 'GAN', 52, 'pre-mix-gain-adjustment', 127, 4, 3),  # DRY GAIN
+                self._add_knob(knobs_layout, 'BIT', 49, 'bit-reduction-amount', 0, 4, 0),  # BIT RED
+                self._add_knob(knobs_layout, 'FLD', 50, 'wave-folder-amount', 0, 4, 1),  # FOLD
+                self._add_knob(knobs_layout, 'DRV', 51, 'overdrive-gain', 0, 4, 2),  # DRIVE
+                self._add_knob(knobs_layout, 'GAN', 52, 'pre-mix-gain-adjustment', 127, 4, 3),  # DRY GAIN
             ])
 
-        select_control.valueChanged.connect(self.process_control_change)
+        select_control.valueChanged.connect(self._process_control_change)
         self.toggled.connect(self.layer_toggled)
 
         layout = PySide6.QtWidgets.QVBoxLayout()
@@ -303,11 +303,11 @@ class WaveguideResonatorControls(GroupOfControls):
         resonator_model_control = ResonatorModelControl(116)  # WAVEGUIDE MODEL
         self._controls = [
             resonator_model_control,   # WAVEGUIDE MODEL
-            self.add_knob(knobs_layout, 'DECAY', 117, 'decay-time', 64, 0, 0),  # DECAY
-            self.add_knob(knobs_layout, 'BODY', 118, 'timbral-character', 64, 2, 0),  # BODY
-            self.add_knob(knobs_layout, 'TUNE', 119, 'pitch-tuning', 64, 4, 0),  # TUNE
+            self._add_knob(knobs_layout, 'DECAY', 117, 'decay-time', 64, 0, 0),  # DECAY
+            self._add_knob(knobs_layout, 'BODY', 118, 'timbral-character', 64, 2, 0),  # BODY
+            self._add_knob(knobs_layout, 'TUNE', 119, 'pitch-tuning', 64, 4, 0),  # TUNE
         ]
-        resonator_model_control.valueChanged.connect(self.process_control_change)
+        resonator_model_control.valueChanged.connect(self._process_control_change)
 
         layout.addWidget(resonator_model_control)
         layout.addLayout(knobs_layout)
