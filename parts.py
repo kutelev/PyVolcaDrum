@@ -169,13 +169,10 @@ class Parts(PySide6.QtWidgets.QWidget):
         enabled_parts = stored_values.get('enabled-parts', list(range(1, 6 + 1)))
         for part_index in range(Parts.__part_count):
             parts.layout().itemAtPosition(part_index, 0).widget().setChecked(part_index + 1 in enabled_parts)
-        if 'enabled-steps' not in stored_values:
-            return parts
         for part_index in range(Parts.__part_count):
             part_name = f'part{part_index + 1}'
-            if part_name not in stored_values['enabled-steps']:
-                continue
-            for step_number in filter(lambda x: x <= stored_values['step-count'], stored_values['enabled-steps'][part_name]):
+            enabled_steps = stored_values.get('enabled-steps', {}).get(part_name, [])
+            for step_number in filter(lambda x: x <= stored_values['step-count'], enabled_steps):
                 parts.step_at(part_index + 1, step_number).setChecked(True)
             overridden_controls = stored_values.get('overridden-controls', {}).get(part_name, {})
             for step_number, overridden_controls in filter(lambda x: int(x[0]) <= stored_values['step-count'], overridden_controls.items()):
