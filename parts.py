@@ -79,6 +79,11 @@ class Parts(PySide6.QtWidgets.QWidget):
     def step_count(self) -> int:
         return self.__step_count
 
+    def step_at(self, part_number: int, step_number: int) -> Step:
+        common.check_int_value('part_number', part_number, 1, 6)
+        common.check_int_value('step_number', step_number, 1, self.__step_count)
+        return self.layout().itemAtPosition(part_number - 1, step_number).widget()
+
     def resize(self, new_step_count) -> None:
         common.check_int_value('new_step_count', new_step_count, 16, 1024)
         if new_step_count == self.__step_count:
@@ -125,7 +130,7 @@ class Parts(PySide6.QtWidgets.QWidget):
     def __do_step(self) -> None:
         enabled_parts = [part_index for part_index in range(Parts.__part_count) if self.layout().itemAtPosition(part_index, 0).widget().isChecked()]
         for part_index in enabled_parts:
-            step: Step = self.layout().itemAtPosition(part_index, self.__current_step_index + 1).widget()
+            step: Step = self.step_at(part_index + 1, self.__current_step_index + 1)
             overridden_values = step.get_overridden_values()
             if overridden_values:
                 self.overridden_values_found.emit(part_index + 1, overridden_values)
@@ -140,11 +145,18 @@ class Parts(PySide6.QtWidgets.QWidget):
             'enabled-parts': [
                 part_index + 1 for part_index in range(Parts.__part_count) if self.layout().itemAtPosition(part_index, 0).widget().isChecked()
             ],
-            'parts-data': {f'part{part_index + 1}': [] for part_index in range(Parts.__part_count)},
+            'enabled-steps': {f'part{part_index + 1}': [] for part_index in range(Parts.__part_count)},
+            'overridden-controls': {f'part{part_index + 1}': {} for part_index in range(Parts.__part_count)},
         }
         for part_index, step_index in itertools.product(range(Parts.__part_count), range(self.__step_count)):
-            if self.layout().itemAtPosition(part_index, step_index + 1).widget().isChecked():
-                stored_values['parts-data'][f'part{part_index + 1}'].append(step_index + 1)
+            step: Step = self.step_at(part_index + 1, step_index + 1)
+            if step.isChecked():
+                stored_values['enabled-steps'][f'part{part_index + 1}'].append(step_index + 1)
+            overridden_values = step.get_overridden_values()
+            if overridden_values:
+                stored_values['overridden-controls'][f'part{part_index + 1}'][step_index + 1] = overridden_values
+        stored_values['enabled-steps'] = {k: v for k, v in stored_values['enabled-steps'].items() if v}
+        stored_values['overridden-controls'] = {k: v for k, v in stored_values['overridden-controls'].items() if v}
         return stored_values
 
     @staticmethod
@@ -154,19 +166,19 @@ class Parts(PySide6.QtWidgets.QWidget):
         else:
             return None
         parts.__timer.setInterval(60000 // stored_values.get('tempo', 60))
-        enabled_parts = stored_values.get('enabled-parts', [])
+        enabled_parts = stored_values.get('enabled-parts', list(range(1, 6 + 1)))
         for part_index in range(Parts.__part_count):
             parts.layout().itemAtPosition(part_index, 0).widget().setChecked(part_index + 1 in enabled_parts)
-        if 'parts-data' not in stored_values:
+        if 'enabled-steps' not in stored_values:
             return parts
         for part_index in range(Parts.__part_count):
             part_name = f'part{part_index + 1}'
-            if part_name not in stored_values['parts-data']:
+            if part_name not in stored_values['enabled-steps']:
                 continue
-            for step_number in stored_values['parts-data'][part_name]:
-                if step_number > stored_values['step-count']:
-                    # This place can only be place if given configuration is invalid.
-                    # Unfortunately this validation can not be performed during JSON schema validation.
-                    continue
-                parts.layout().itemAtPosition(part_index, step_number).widget().setChecked(True)
+            for step_number in filter(lambda x: x <= stored_values['step-count'], stored_values['enabled-steps'][part_name]):
+                parts.step_at(part_index + 1, step_number).setChecked(True)
+            overridden_controls = stored_values.get('overridden-controls', {}).get(part_name, {})
+            for step_number, overridden_controls in filter(lambda x: int(x[0]) <= stored_values['step-count'], overridden_controls.items()):
+                parts.step_at(part_index + 1, int(step_number)).set_overridden_values(overridden_controls)
+
         return parts

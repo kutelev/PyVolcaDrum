@@ -22,6 +22,9 @@ class Knob(PySide6.QtWidgets.QDial):
     def paintEvent(self, event: PySide6.QtGui.QPaintEvent) -> None:
         super().paintEvent(event)
         painter = PySide6.QtGui.QPainter(self)
+        pen = painter.pen()
+        pen.setColor(PySide6.QtCore.Qt.GlobalColor.red if self.property('is-overridden') else PySide6.QtCore.Qt.GlobalColor.black)
+        painter.setPen(pen)
         font_metrics = painter.fontMetrics()
         text = str(self.value())
         text_size = font_metrics.size(0, text, 0)
@@ -161,11 +164,12 @@ class ResonatorModelControl(Selector):
 class GroupOfControls(PySide6.QtWidgets.QGroupBox):
     control_changed = PySide6.QtCore.Signal(int, int)
 
-    def __init__(self, title: str):
+    def __init__(self, title: str, override_controls_only: bool = False):
         super().__init__()
         self.setTitle(title)
         self.setStyleSheet('QGroupBox { font: bold }')
         self._controls: typing.List[typing.Union[Knob, Selector]] = []
+        self.__override_controls_only = override_controls_only
 
     def _add_knob(self, layout: PySide6.QtWidgets.QGridLayout, title: str, control_number: int, control_name: str, default_value: int, row: int, col: int) -> \
             Knob:
@@ -187,7 +191,7 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
 
     def _process_control_change(self) -> None:
         control = self.sender()
-        control.setProperty('is-overridden', True)
+        control.setProperty('is-overridden', self.__override_controls_only)
         self.control_changed.emit(control.property('control-number'), control.value())
 
     def store(self, overrides_only: bool = False) -> dict:
@@ -214,17 +218,17 @@ class GroupOfControls(PySide6.QtWidgets.QGroupBox):
 class LayerControls(GroupOfControls):
     layer_toggled = PySide6.QtCore.Signal()
 
-    def __init__(self, part_number: int, layer_number: int, override_controls: bool):
+    def __init__(self, part_number: int, layer_number: int, override_controls_only: bool):
         common.check_int_value('part_number', part_number, 1, 6)
         common.check_int_value('layer_number', layer_number, 1, 2)
-        super().__init__(f'LAYER {layer_number}')
+        super().__init__(f'LAYER {layer_number}', override_controls_only)
         self.layer_number = layer_number
         self.part_number = part_number
 
         layout = PySide6.QtWidgets.QVBoxLayout()
         knobs_layout = PySide6.QtWidgets.QGridLayout()
 
-        if not override_controls:
+        if not override_controls_only:
             select_control = SelectControl(14 + layer_number - 1)  # SELECT1 or SELECT2
             select_control.valueChanged.connect(self._process_control_change)
             layout.addWidget(select_control)
@@ -265,7 +269,7 @@ class LayerControls(GroupOfControls):
         self.setLayout(layout)
 
     def sync(self, other) -> None:
-        self.restore(other.store(), None, False)
+        self.restore(other.store(), other.store(True), False)
 
 
 class PartControls(PySide6.QtWidgets.QGroupBox):
@@ -327,17 +331,29 @@ class PartControls(PySide6.QtWidgets.QGroupBox):
 
 
 class PartOverrideControls(PySide6.QtWidgets.QDialog):
-    def __init__(self, original_part_controls: PartControls, overrides: dict):
+    def __init__(self, original_part_controls: PartControls, overridden_values: dict):
         super().__init__()
         self.setWindowTitle('PyVolcaDrum: override controls')
-        self.part_controls = PartControls(original_part_controls.part_number, True)
-        self.part_controls.restore(original_part_controls.store(), overrides)
-        layout = PySide6.QtWidgets.QGridLayout()
-        layout.addWidget(self.part_controls, 0, 0)
+        reset_button = PySide6.QtWidgets.QPushButton('Reset')
+        reset_button.clicked.connect(self.__reset)
+        self.__original_part_controls = original_part_controls
+        self.__part_controls = PartControls(original_part_controls.part_number, True)
+        self.__part_controls.restore(original_part_controls.store(), overridden_values)
+        ok_button = PySide6.QtWidgets.QPushButton('OK')
+        ok_button.clicked.connect(self.accept)
+        layout = PySide6.QtWidgets.QVBoxLayout()
+        layout.addWidget(reset_button)
+        layout.addWidget(self.__part_controls)
+        layout.addWidget(ok_button)
+
         self.setLayout(layout)
 
+    def __reset(self):
+        self.__part_controls.restore({})
+        self.accept()
+
     def get_overridden_values(self) -> typing.Optional[dict]:
-        return self.part_controls.get_overridden_values()
+        return self.__part_controls.get_overridden_values()
 
 
 class WaveguideResonatorControls(GroupOfControls):

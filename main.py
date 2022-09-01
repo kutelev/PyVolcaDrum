@@ -2,6 +2,7 @@ import os
 import sys
 import typing
 
+import PySide6.QtCore
 import PySide6.QtGui
 import PySide6.QtWidgets
 import mido
@@ -24,12 +25,13 @@ class PortSelectionDialog(PySide6.QtWidgets.QDialog):
         self.port_selector.currentTextChanged.connect(self.__port_selected)
 
         self.ok_button = PySide6.QtWidgets.QPushButton('OK')
+        self.ok_button.setSizePolicy(PySide6.QtWidgets.QSizePolicy.Policy.Maximum, PySide6.QtWidgets.QSizePolicy.Policy.Maximum)
         self.ok_button.hide()
         self.ok_button.clicked.connect(self.accept)
 
         layout = PySide6.QtWidgets.QVBoxLayout()
-        layout.addWidget(self.port_selector)
-        layout.addWidget(self.ok_button)
+        layout.addWidget(self.port_selector, 0, PySide6.QtCore.Qt.AlignCenter)
+        layout.addWidget(self.ok_button, 0, PySide6.QtCore.Qt.AlignCenter)
         self.setLayout(layout)
 
         self.setFixedSize(self.sizeHint())
@@ -139,7 +141,8 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         original_part_controls = self.__part_controls[step.property('part-number') - 1]
         overridden_values = step.property('overridden-values')
         fine_tuning_dialog = controls.PartOverrideControls(original_part_controls, overridden_values)
-        fine_tuning_dialog.exec()
+        if fine_tuning_dialog.exec() != PySide6.QtWidgets.QDialog.Accepted:
+            return
         overridden_values = fine_tuning_dialog.get_overridden_values()
         step.set_overridden_values(overridden_values)
 

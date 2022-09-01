@@ -11,106 +11,81 @@
       "properties": {
         "parts": {
           "type": "object",
-          "properties": {
-            "part1": {
-              "$ref": "#/$defs/part"
-            },
-            "part2": {
-              "$ref": "#/$defs/part"
-            },
-            "part3": {
-              "$ref": "#/$defs/part"
-            },
-            "part4": {
-              "$ref": "#/$defs/part"
-            },
-            "part5": {
-              "$ref": "#/$defs/part"
-            },
-            "part6": {
+          "patternProperties": {
+            "^part[1-6]$": {
               "$ref": "#/$defs/part"
             }
           },
-          "required": [
-            "part1",
-            "part2",
-            "part3",
-            "part4",
-            "part5",
-            "part6"
-          ]
+          "additionalProperties": false
+        },
+        "waveguide-resonator": {
+          "type": "object",
+          "patternProperties": {
+            "^(resonator-model|decay-time|timbral-character|pitch-tuning)$": {
+              "$ref": "#/$defs/control-value"
+            }
+          }
         }
-      }
+      },
+      "additionalProperties": false
     },
-    "properties": {
-      "parts": {
-        "type": "object",
-        "properties": {
-          "step-count": {
+    "parts": {
+      "type": "object",
+      "properties": {
+        "step-count": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1024
+        },
+        "tempo": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 360
+        },
+        "enabled-parts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
             "type": "integer",
-            "minimum": 16,
-            "maximum": 1024
-          },
-          "tempo": {
-            "type": "integer",
-            "minimum": 60,
-            "maximum": 360
-          },
-          "enabled-parts": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 6
-            }
-          },
-          "parts-data": {
-            "type": "object",
-            "properties": {
-              "part1": {
-                "$ref": "#/$defs/part-data"
-              },
-              "part2": {
-                "$ref": "#/$defs/part-data"
-              },
-              "part3": {
-                "$ref": "#/$defs/part-data"
-              },
-              "part4": {
-                "$ref": "#/$defs/part-data"
-              },
-              "part5": {
-                "$ref": "#/$defs/part-data"
-              },
-              "part6": {
-                "$ref": "#/$defs/part-data"
-              }
-            },
-            "required": [
-              "part1",
-              "part2",
-              "part3",
-              "part4",
-              "part5",
-              "part6"
-            ]
+            "minimum": 1,
+            "maximum": 6
           }
         },
-        "required": [
-          "step-count",
-          "tempo",
-          "enabled-parts",
-          "parts-data"
-        ]
-      }
+        "enabled-steps": {
+          "type": "object",
+          "patternProperties": {
+            "^part[1-6]$": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "overridden-controls": {
+          "type": "object",
+          "patternProperties": {
+            "^part[1-6]$": {
+              "patternProperties": {
+                "^[1-9][0-9]*$": {
+                  "$ref": "#/$defs/part"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "step-count"
+      ]
     }
   },
-  "required": [
-    "port",
-    "controls",
-    "parts"
-  ],
+  "additionalProperties": false,
   "$defs": {
     "control-value": {
       "type": "integer",
@@ -120,96 +95,26 @@
     "part": {
       "type": "object",
       "properties": {
-        "layer2": {
+        "layer1": {
           "type": "object",
-          "properties": {
-            "select": {
-              "$ref": "#/$defs/control-value"
-            },
-            "level": {
-              "$ref": "#/$defs/control-value"
-            },
-            "modulation-amount": {
-              "$ref": "#/$defs/control-value"
-            },
-            "modulation-rate": {
-              "$ref": "#/$defs/control-value"
-            },
-            "pitch": {
-              "$ref": "#/$defs/control-value"
-            },
-            "envelope-generator-attack": {
-              "$ref": "#/$defs/control-value"
-            },
-            "envelope-generator-release": {
+          "patternProperties": {
+            "^(select|level|modulation-amount|modulation-rate|pitch|envelope-generator-attack|envelope-generator-release|left-right-pan|send-amount|bit-reduction-amount|wave-folder-amount|overdrive-gain|pre-mix-gain-adjustment)$": {
               "$ref": "#/$defs/control-value"
             }
           },
-          "required": [
-            "select",
-            "level",
-            "modulation-amount",
-            "modulation-rate",
-            "pitch",
-            "envelope-generator-attack",
-            "envelope-generator-release"
-          ]
+          "additionalProperties": false
         },
-        "layer1": {
+        "layer2": {
           "type": "object",
-          "allOf": [
-            {
-              "$ref": "#/$defs/part/properties/layer2/properties",
-              "properties": {
-                "left-right-pan": {
-                  "$ref": "#/$defs/control-value"
-                },
-                "send-amount": {
-                  "$ref": "#/$defs/control-value"
-                },
-                "bit-reduction-amount": {
-                  "$ref": "#/$defs/control-value"
-                },
-                "wave-folder-amount": {
-                  "$ref": "#/$defs/control-value"
-                },
-                "overdrive-gain": {
-                  "$ref": "#/$defs/control-value"
-                },
-                "pre-mix-gain-adjustment": {
-                  "$ref": "#/$defs/control-value"
-                }
-              }
+          "patternProperties": {
+            "^(select|level|modulation-amount|modulation-rate|pitch|envelope-generator-attack|envelope-generator-release)$": {
+              "$ref": "#/$defs/control-value"
             }
-          ],
-          "required": [
-            "select",
-            "level",
-            "modulation-amount",
-            "modulation-rate",
-            "left-right-pan",
-            "pitch",
-            "envelope-generator-attack",
-            "envelope-generator-release",
-            "send-amount",
-            "bit-reduction-amount",
-            "wave-folder-amount",
-            "overdrive-gain",
-            "pre-mix-gain-adjustment"
-          ]
+          },
+          "additionalProperties": false
         }
       },
-      "required": [
-        "layer1"
-      ]
-    },
-    "part-data": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "integer",
-        "minimum": 1
-      }
+      "additionalProperties": false
     }
   }
 }
