@@ -37,6 +37,11 @@
           "minimum": 16,
           "maximum": 1024
         },
+        "beats-per-measure": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 16
+        },
         "tempo": {
           "type": "integer",
           "minimum": 60,

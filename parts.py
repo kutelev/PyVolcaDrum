@@ -11,13 +11,17 @@ __all__ = ['Parts']
 
 
 class Step(PySide6.QtWidgets.QToolButton):
-    def __init__(self, part_number: int):
+    def __init__(self, part_number: int, is_strong: bool):
         common.check_int_value('part_number', part_number, 1, 6)
         super().__init__()
         self.setCheckable(True)
         self.setContextMenuPolicy(PySide6.QtCore.Qt.CustomContextMenu)
         self.setProperty('part-number', part_number)
         self.setText('-')
+        self.__is_strong = is_strong
+
+    def mark_as_strong(self, is_strong: bool) -> None:
+        self.__is_strong = is_strong
 
     def set_overridden_values(self, overridden_values: typing.Optional[dict]) -> None:
         self.setProperty('overridden-values', overridden_values)
@@ -25,6 +29,14 @@ class Step(PySide6.QtWidgets.QToolButton):
 
     def get_overridden_values(self) -> typing.Optional[dict]:
         return self.property('overridden-values')
+
+    def paintEvent(self, event: PySide6.QtGui.QPaintEvent) -> None:
+        super().paintEvent(event)
+        if not self.__is_strong:
+            return
+        painter = PySide6.QtGui.QPainter(self)
+        painter.setPen(PySide6.QtCore.Qt.GlobalColor.darkRed)
+        painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
 
 
 class Dot(PySide6.QtWidgets.QRadioButton):
@@ -40,10 +52,12 @@ class Parts(PySide6.QtWidgets.QWidget):
 
     __part_count = 6
 
-    def __init__(self, initial_step_count: int = 16):
+    def __init__(self, initial_step_count: int = 16, initial_bpm: int = 4):
         common.check_int_value('initial_step_count', initial_step_count, 16, 1024)
+        common.check_int_value('initial_bpm', initial_bpm, 2, 16)
         super().__init__()
         self.__step_count = initial_step_count
+        self.__bpm = initial_bpm
         self.__current_step_index = 0
 
         layout = PySide6.QtWidgets.QGridLayout()
@@ -55,7 +69,7 @@ class Parts(PySide6.QtWidgets.QWidget):
             check_box.setChecked(True)
             layout.addWidget(check_box, part_index, 0, 1, 1, PySide6.QtCore.Qt.AlignRight)
         for part_index, step_index in itertools.product(range(Parts.__part_count), range(initial_step_count)):
-            step = Step(part_index + 1)
+            step = Step(part_index + 1, step_index % self.__bpm == 0)
             step.customContextMenuRequested.connect(self.step_context_requested)
             layout.addWidget(step, part_index, step_index + 1)
         for step_index in range(initial_step_count):
@@ -79,31 +93,42 @@ class Parts(PySide6.QtWidgets.QWidget):
     def step_count(self) -> int:
         return self.__step_count
 
+    @property
+    def bpm(self) -> int:
+        return self.__bpm
+
     def step_at(self, part_number: int, step_number: int) -> Step:
         common.check_int_value('part_number', part_number, 1, 6)
         common.check_int_value('step_number', step_number, 1, self.__step_count)
         return self.layout().itemAtPosition(part_number - 1, step_number).widget()
 
-    def resize(self, new_step_count) -> None:
+    def reshape(self, new_step_count, new_bpm) -> None:
         common.check_int_value('new_step_count', new_step_count, 16, 1024)
-        if new_step_count == self.__step_count:
+        common.check_int_value('new_bpm', new_bpm, 2, 16)
+        if new_step_count == self.__step_count and new_bpm == self.__bpm:
             return
-        self.stop()
+        if new_step_count != self.__step_count:
+            self.stop()
         if new_step_count > self.__step_count:
             for part_index, step_index in itertools.product(range(Parts.__part_count), range(self.__step_count, new_step_count)):
-                step = Step(part_index + 1)
+                step = Step(part_index + 1, step_index % self.__bpm == 0)
                 step.customContextMenuRequested.connect(self.step_context_requested)
                 self.layout().addWidget(step, part_index, step_index + 1)
             for step_index in range(self.__step_count, new_step_count):
                 dot = Dot(step_index)
                 dot.clicked.connect(self.__process_dot_click)
                 self.layout().addWidget(dot, Parts.__part_count, step_index + 1, 1, 1, PySide6.QtCore.Qt.AlignCenter)
-        else:
+        elif new_step_count < self.__step_count:
             for row_index, step_index in itertools.product(range(Parts.__part_count + 1), range(new_step_count, self.__step_count)):
                 widget = self.layout().itemAtPosition(row_index, step_index + 1).widget()
                 self.layout().removeWidget(widget)
                 widget.deleteLater()
+        for part_index, step_index in itertools.product(range(Parts.__part_count), range(new_step_count)):
+            step = self.step_at(part_index + 1, step_index + 1)
+            step.mark_as_strong(step_index % new_bpm == 0)
         self.__step_count = new_step_count
+        self.__bpm = new_bpm
+        self.repaint()
 
     @property
     def tempo(self) -> int:
@@ -141,6 +166,7 @@ class Parts(PySide6.QtWidgets.QWidget):
     def store(self) -> dict:
         stored_values = {
             'step-count': self.__step_count,
+            'beats-per-measure': self.__bpm,
             'tempo': min(360, max(60, self.tempo)),
             'enabled-parts': [
                 part_index + 1 for part_index in range(Parts.__part_count) if self.layout().itemAtPosition(part_index, 0).widget().isChecked()
@@ -162,7 +188,7 @@ class Parts(PySide6.QtWidgets.QWidget):
     @staticmethod
     def restore(stored_values: typing.Optional[dict]):  # -> Parts:
         if 'step-count' in stored_values:
-            parts = Parts(stored_values['step-count'])
+            parts = Parts(stored_values['step-count'], stored_values.get('beats-per-measure', 4))
         else:
             return None
         parts.__timer.setInterval(60000 // stored_values.get('tempo', 60))
