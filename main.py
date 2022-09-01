@@ -96,7 +96,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>TEMPO</b>'))
         self.__tempo_control = PySide6.QtWidgets.QSpinBox()
         self.__tempo_control.setRange(60, 360)
-        self.__tempo_control.editingFinished.connect(self.__change_tempo)
+        self.__tempo_control.valueChanged.connect(self.__change_tempo)
         play_controls_layout.addWidget(self.__tempo_control)
         layout.addLayout(play_controls_layout, 2, 0, 1, 7)
 
