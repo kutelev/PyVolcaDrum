@@ -187,6 +187,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 def main() -> int:
     application = PySide6.QtWidgets.QApplication(sys.argv)
     application.setWheelScrollLines(1)
+    application.setWindowIcon(PySide6.QtGui.QIcon(os.path.join(common.resources_directory_path, 'icon.svg')))
 
     port_selector = PortSelectionDialog()
     if port_selector.exec() != PySide6.QtWidgets.QDialog.Accepted:
