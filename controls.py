@@ -279,6 +279,7 @@ class PartControls(PySide6.QtWidgets.QGroupBox):
         common.check_int_value('part_number', part_number, 1, 6)
         super().__init__()
         self.setTitle(f'PART {part_number}')
+        self.setCheckable(not override_controls)
         self.setStyleSheet('QGroupBox { font: bold }')
         self.__part_number = part_number
         layout = PySide6.QtWidgets.QVBoxLayout()
@@ -359,6 +360,7 @@ class PartOverrideControls(PySide6.QtWidgets.QDialog):
 class WaveguideResonatorControls(GroupOfControls):
     def __init__(self):
         super().__init__('WAVE GUIDE')
+        self.setCheckable(True)
         knobs_layout = PySide6.QtWidgets.QGridLayout()
         layout = PySide6.QtWidgets.QVBoxLayout()
         resonator_model_control = ResonatorModelControl(116)  # WAVEGUIDE MODEL
