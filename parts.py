@@ -123,11 +123,11 @@ class Parts(PySide6.QtWidgets.QWidget):
                 widget = self.layout().itemAtPosition(row_index, step_index + 1).widget()
                 self.layout().removeWidget(widget)
                 widget.deleteLater()
+        self.__step_count = new_step_count
+        self.__bpm = new_bpm
         for part_index, step_index in itertools.product(range(Parts.__part_count), range(new_step_count)):
             step = self.step_at(part_index + 1, step_index + 1)
             step.mark_as_strong(step_index % new_bpm == 0)
-        self.__step_count = new_step_count
-        self.__bpm = new_bpm
         self.repaint()
 
     @property
