@@ -144,6 +144,13 @@ class Parts(PySide6.QtWidgets.QWidget):
         self.__timer.stop()
         self.__go_to(0)
 
+    def enable_current_step(self, part_number: int) -> None:
+        self.note_on.emit(part_number)
+        if not self.__timer.isActive():
+            return
+        insert_to_next_step = self.__timer.remainingTime() < self.__timer.interval() / 2
+        self.step_at(part_number, (self.__current_step_index + int(insert_to_next_step)) % self.__step_count).setChecked(True)
+
     def __process_dot_click(self) -> None:
         self.__go_to(self.sender().property('id'))
 

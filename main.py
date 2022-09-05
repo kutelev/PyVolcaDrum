@@ -158,6 +158,19 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.__play_button.setChecked(False)
         super().closeEvent(event)
 
+    def keyPressEvent(self, event: PySide6.QtGui.QKeyEvent) -> None:
+        key_to_part = {
+            PySide6.QtCore.Qt.Key_1: 1,
+            PySide6.QtCore.Qt.Key_2: 2,
+            PySide6.QtCore.Qt.Key_3: 3,
+            PySide6.QtCore.Qt.Key_4: 4,
+            PySide6.QtCore.Qt.Key_5: 5,
+            PySide6.QtCore.Qt.Key_6: 6,
+        }
+        if event.key() not in key_to_part:
+            return
+        self.__parts.enable_current_step(key_to_part[event.key()])
+
     def store(self) -> None:
         stored_values = {
             'port': self.__port.name,
