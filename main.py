@@ -7,10 +7,10 @@ import PySide6.QtGui
 import PySide6.QtWidgets
 import mido
 
-import common
 import config
-import controls
-import parts
+import modules.common
+import modules.controls
+import modules.parts
 
 
 class PortSelectionDialog(PySide6.QtWidgets.QDialog):
@@ -45,9 +45,9 @@ class PortSelectionDialog(PySide6.QtWidgets.QDialog):
 
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
-        if not os.path.exists(common.config_path):
+        if not os.path.exists(modules.common.config_path):
             return
-        stored_values = config.load_config(file_path=common.config_path)
+        stored_values = config.load_config(file_path=modules.common.config_path)
         if 'port' in stored_values:
             self.port_selector.setCurrentText(stored_values['port'])
 
@@ -59,16 +59,16 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
         # Controls
         layout = PySide6.QtWidgets.QGridLayout()
-        self.__part_controls = [controls.PartControls(i) for i in range(1, 6 + 1)]
+        self.__part_controls = [modules.controls.PartControls(i) for i in range(1, 6 + 1)]
         for i, part_control in enumerate(self.__part_controls):
             layout.addWidget(part_control, 0, i)
             part_control.control_changed.connect(self.__process_control_change)
-        self.__waveguide_resonator_control = controls.WaveguideResonatorControls()
+        self.__waveguide_resonator_control = modules.controls.WaveguideResonatorControls()
         layout.addWidget(self.__waveguide_resonator_control, 0, 6)
         self.__waveguide_resonator_control.control_changed.connect(self.__process_control_change)
 
         # Parts data (timeline)
-        self.__parts = parts.Parts()
+        self.__parts = modules.parts.Parts()
         self.__parts.note_on.connect(self.__process_note_on)
         self.__parts.overridden_values_found.connect(self.__process_overridden_values)
         self.__parts.step_context_requested.connect(self.__show_override_controls_dialog)
@@ -80,7 +80,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
         # Play controls
         play_controls_layout = PySide6.QtWidgets.QHBoxLayout()
-        play_icon = PySide6.QtGui.QIcon(os.path.join(common.resources_directory_path, 'play.svg'))
+        play_icon = PySide6.QtGui.QIcon(os.path.join(modules.common.resources_directory_path, 'play.svg'))
         self.__play_button = PySide6.QtWidgets.QToolButton()
         self.__play_button.setCheckable(True)
         self.__play_button.setIcon(play_icon)
@@ -134,17 +134,17 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
     def __resize_parts(self) -> None:
         self.__play_button.setChecked(False)
-        self.__parts.reshape(self.__step_count_control.value(), self.__bpm_control.value())
+        self.__parts.change_step_count(self.__step_count_control.value(), self.__bpm_control.value())
 
     def __change_tempo(self) -> None:
         sender: PySide6.QtWidgets.QSpinBox = self.sender()
         self.__parts.change_tempo(sender.value())
 
     def __show_override_controls_dialog(self) -> None:
-        step: parts.Step = self.sender().sender()
+        step: modules.parts.Step = self.sender().sender()
         original_part_controls = self.__part_controls[step.property('part-number') - 1]
         overridden_values = step.property('overridden-values')
-        fine_tuning_dialog = controls.PartOverrideControls(original_part_controls, overridden_values)
+        fine_tuning_dialog = modules.controls.PartOverrideControls(original_part_controls, overridden_values)
         if fine_tuning_dialog.exec() != PySide6.QtWidgets.QDialog.Accepted:
             return
         overridden_values = fine_tuning_dialog.get_overridden_values()
@@ -180,10 +180,10 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             },
             'parts': self.__parts.store(),
         }
-        config.store_config(stored_values, common.config_path)
+        config.store_config(stored_values, modules.common.config_path)
 
     def restore(self) -> None:
-        stored_values = config.load_config(file_path=common.config_path)
+        stored_values = config.load_config(file_path=modules.common.config_path)
         for i in range(6):
             self.__part_controls[i].restore(stored_values.get('controls', {}).get('parts', {}).get(f'part{i + 1}', {}))
         self.__waveguide_resonator_control.restore(stored_values.get('controls', {}).get('waveguide-resonator', {}))
@@ -209,7 +209,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 def main() -> int:
     application = PySide6.QtWidgets.QApplication(sys.argv)
     application.setWheelScrollLines(1)
-    application.setWindowIcon(PySide6.QtGui.QIcon(os.path.join(common.resources_directory_path, 'icon.svg')))
+    application.setWindowIcon(PySide6.QtGui.QIcon(os.path.join(modules.common.resources_directory_path, 'icon.svg')))
 
     port_selector = PortSelectionDialog()
     if port_selector.exec() != PySide6.QtWidgets.QDialog.Accepted:

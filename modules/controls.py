@@ -5,7 +5,7 @@ import PySide6.QtCore
 import PySide6.QtGui
 import PySide6.QtWidgets
 
-import common
+import modules.common
 
 
 class Knob(PySide6.QtWidgets.QDial):
@@ -52,7 +52,7 @@ class Selector(PySide6.QtWidgets.QWidget):
         button_group = PySide6.QtWidgets.QButtonGroup(self)
         for i, parameter_name in enumerate(names):
             icon_name = parameter_name.lower().replace(' ', '-')
-            icon_path = os.path.join(common.resources_directory_path, resource_type, f'{icon_name}.svg')
+            icon_path = os.path.join(modules.common.resources_directory_path, resource_type, f'{icon_name}.svg')
             icon = PySide6.QtGui.QIcon(icon_path)
             button = PySide6.QtWidgets.QToolButton()
             button.setIcon(icon)
@@ -219,8 +219,8 @@ class LayerControls(GroupOfControls):
     layer_toggled = PySide6.QtCore.Signal()
 
     def __init__(self, part_number: int, layer_number: int, override_controls_only: bool):
-        common.check_int_value('part_number', part_number, 1, 6)
-        common.check_int_value('layer_number', layer_number, 1, 2)
+        modules.common.check_int_value('part_number', part_number, 1, 6)
+        modules.common.check_int_value('layer_number', layer_number, 1, 2)
         super().__init__(f'LAYER {layer_number}', override_controls_only)
         self.layer_number = layer_number
         self.part_number = part_number
@@ -276,7 +276,7 @@ class PartControls(PySide6.QtWidgets.QGroupBox):
     control_changed = PySide6.QtCore.Signal(int, int)
 
     def __init__(self, part_number: int, override_controls: bool = False):
-        common.check_int_value('part_number', part_number, 1, 6)
+        modules.common.check_int_value('part_number', part_number, 1, 6)
         super().__init__()
         self.setTitle(f'PART {part_number}')
         self.setCheckable(not override_controls)
