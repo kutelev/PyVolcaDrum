@@ -92,6 +92,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.__step_count_control = PySide6.QtWidgets.QSpinBox()
         self.__step_count_control.setRange(16, 1024)
         self.__step_count_control.editingFinished.connect(self.__resize_parts)
+        self.__parts.step_count_changed.connect(self.__step_count_control.setValue)
         play_controls_layout.addWidget(self.__step_count_control)
         play_controls_layout.addWidget(PySide6.QtWidgets.QLabel('<b>BPM</b>'))
         self.__bpm_control = PySide6.QtWidgets.QSpinBox()
@@ -197,6 +198,7 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             new_parts.note_on.connect(self.__process_note_on)
             new_parts.overridden_values_found.connect(self.__process_overridden_values)
             new_parts.step_context_requested.connect(self.__show_override_controls_dialog)
+            new_parts.step_count_changed.connect(self.__step_count_control.setValue)
         for widget in [self.__step_count_control, self.__bpm_control, self.__tempo_control]:
             widget.blockSignals(True)
         self.__step_count_control.setValue(self.__parts.step_count)

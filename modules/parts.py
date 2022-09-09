@@ -87,6 +87,7 @@ class Parts(PySide6.QtWidgets.QWidget):
     note_on = PySide6.QtCore.Signal(int)  # Channel number is sent (range from 1 to 6 inclusive).
     step_context_requested = PySide6.QtCore.Signal()
     overridden_values_found = PySide6.QtCore.Signal(int, dict)  # Sends channel number and overridden values.
+    step_count_changed = PySide6.QtCore.Signal(int)
 
     __part_count = 6
     __part_numbers = list(range(1, __part_count + 1))
@@ -157,7 +158,8 @@ class Parts(PySide6.QtWidgets.QWidget):
         modules.common.check_int_value('new_bpm', new_bpm, 2, Parts.__min_step_count)
         if new_step_count == self.__step_count and new_bpm == self.__bpm:
             return
-        if new_step_count != self.__step_count:
+        step_count_change_requested = new_step_count != self.__step_count
+        if step_count_change_requested:
             self.stop()
         if new_step_count > self.__step_count:
             for part_number, step_number in itertools.product(Parts.__part_numbers, range(self.__step_count + 1, new_step_count + 1)):
@@ -175,6 +177,8 @@ class Parts(PySide6.QtWidgets.QWidget):
             step = self.step_at(part_number, step_number)
             step.mark_as_strong(((step_number - 1) % new_bpm) == 0)
         self.repaint()
+        if step_count_change_requested:
+            self.step_count_changed.emit(new_step_count)
 
     def __move_steps(self, position: int, distance: int) -> None:
         src_step_range = list(range(position, self.__step_count + (abs(distance) if distance < 0 else 0) + 1))
@@ -195,10 +199,12 @@ class Parts(PySide6.QtWidgets.QWidget):
             move_step(step_number, step_number + distance)
 
     def __insert_steps(self, position: int, steps_to_insert: int) -> None:
+        self.change_step_count(self.step_count + steps_to_insert, self.__bpm)
         self.__move_steps(position + 1, steps_to_insert)
 
     def __delete_steps(self, position: int, steps_to_delete: int) -> None:
         self.__move_steps(position + steps_to_delete, -steps_to_delete)
+        self.change_step_count(self.step_count - steps_to_delete, self.__bpm)
 
     @property
     def tempo(self) -> int:
