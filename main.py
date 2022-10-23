@@ -109,7 +109,17 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         self.setCentralWidget(PySide6.QtWidgets.QWidget())
         self.centralWidget().setLayout(layout)
 
+        self.__init_menu()
+
         self.__port = mido.open_output(port_name)  # noqa: open_output is a dynamically generated thing.
+
+    def __init_menu(self) -> None:
+        menu_bar = PySide6.QtWidgets.QMenuBar()
+        file_menu = PySide6.QtWidgets.QMenu('&File')
+        file_menu.addAction('&Open...', self.__open, PySide6.QtGui.QKeySequence('Ctrl+O'))
+        file_menu.addAction('&Save as...', self.__save_as, PySide6.QtGui.QKeySequence('Ctrl+S'))
+        menu_bar.addMenu(file_menu)
+        self.setMenuBar(menu_bar)
 
     def __del__(self):
         self.__port.close()
@@ -153,7 +163,8 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
 
     def showEvent(self, event: PySide6.QtGui.QShowEvent) -> None:
         super().showEvent(event)
-        self.restore()
+        stored_values = config.load_config(file_path=modules.common.config_path)
+        self.restore(stored_values)
 
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
         self.__play_button.setChecked(False)
@@ -172,8 +183,8 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             return
         self.__parts.enable_current_step(key_to_part[event.key()])
 
-    def store(self) -> None:
-        stored_values = {
+    def store(self) -> dict:
+        return {
             'port': self.__port.name,
             'controls': {
                 'parts': {f'part{i + 1}': self.__part_controls[i].store() for i in range(6)},
@@ -181,10 +192,8 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
             },
             'parts': self.__parts.store(),
         }
-        config.store_config(stored_values, modules.common.config_path)
 
-    def restore(self) -> None:
-        stored_values = config.load_config(file_path=modules.common.config_path)
+    def restore(self, stored_values: dict) -> None:
         for i in range(6):
             self.__part_controls[i].restore(stored_values.get('controls', {}).get('parts', {}).get(f'part{i + 1}', {}))
         self.__waveguide_resonator_control.restore(stored_values.get('controls', {}).get('waveguide-resonator', {}))
@@ -207,6 +216,24 @@ class MainWindow(PySide6.QtWidgets.QMainWindow):
         for widget in [self.__step_count_control, self.__bpm_control, self.__tempo_control]:
             widget.blockSignals(False)
 
+    def __save_as(self) -> None:
+        file_path = PySide6.QtWidgets.QFileDialog.getSaveFileName(self, 'Save File ...', '.', 'JSON files (*.json)')[0]
+        if not file_path:
+            return
+        stored_values = self.store()
+        del stored_values['port']
+        config.store_config(stored_values, file_path)
+
+    def __open(self) -> None:
+        file_path = PySide6.QtWidgets.QFileDialog.getOpenFileName(self, 'Open File ...', '.', 'JSON files (*.json)')[0]
+        if not file_path:
+            return
+        stored_values = config.load_config(file_path=file_path)
+        if not stored_values:
+            PySide6.QtWidgets.QMessageBox.critical(self, self.windowTitle(), f'"{os.path.basename(file_path)}" file does not seem to be a valid config.')
+            return
+        self.restore(stored_values)
+
 
 def main() -> int:
     application = PySide6.QtWidgets.QApplication(sys.argv)
@@ -220,7 +247,8 @@ def main() -> int:
     main_window = MainWindow(port_selector.get_port_name())
     main_window.showMaximized()
     ret_code = application.exec()
-    main_window.store()
+    stored_values = main_window.store()
+    config.store_config(stored_values, modules.common.config_path)
     return ret_code
 
 
